@@ -1,0 +1,5 @@
+.env
+venv
+INFO.log
+WARN.log
+.idea/
