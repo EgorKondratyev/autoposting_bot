@@ -6,16 +6,18 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher import FSMContext
 from aiogram.utils.exceptions import BadRequest
+from async_cron.job import CronJob
 
 from create_bot.bot import dp
-from databases.client import ChannelDB, PostDB
+from databases.client import ChannelDB, PostDB, IndividualPostDB
 from handlers.stop_fsm import create_keyboard_stop_fsm
 from keyboards.inline.individual_post import create_keyboard_channels, create_keyboard_time_24_hours, \
     create_keyboard_tagged_channels, create_keyboard_day, create_confirm_post, create_url_menu, create_button_for_post
 from states.individual_post import IndividualPostFSM
 from log.create_logger import logger
-from utils.publication_post_individual import publication_post
+from utils.publication_post_individual import publication_post, send_album
 from utils.generate_random_tag import generate_random_tag_md5
+from utils.create_cron import msh
 
 
 # @dp.callback_query_handler(Text(equals='start_create_post'))
@@ -144,6 +146,7 @@ async def get_button_for_post(callback: CallbackQuery, state: FSMContext):
     day = callback.data[4:]
     async with state.proxy() as data:
         data['day'] = day
+        data['tag'] = await generate_random_tag_md5()
 
     await callback.message.edit_text('Хочешь ли добавить кнопку к своему посту?', reply_markup=create_url_menu)
     await IndividualPostFSM.get_button.set()
@@ -197,9 +200,7 @@ async def get_post(message: Message, state: FSMContext):
 # @dp.message_handler(state=IndividualPostFSM.get_post, content_types='any')
 async def confirm_create_post(message: Message, state: FSMContext):
     try:
-        smiles = '✉📩📧📦🗳'
-        smile = random.choice(smiles)
-
+        individual_post_db = IndividualPostDB()
         if message.photo:
             if message.caption is not None:
                 text_user = message.caption
@@ -208,11 +209,15 @@ async def confirm_create_post(message: Message, state: FSMContext):
             async with state.proxy() as data:
                 data['text'] = text_user
                 data['photo'] = message.photo[-1].file_id
+                tag = data['tag']
 
-                text_confirm_post = f'{text_user}'
-                await message.answer_photo(photo=message.photo[-1].file_id,
-                                           caption=text_confirm_post, parse_mode='html',
-                                           reply_markup=await create_confirm_post())
+            if message.media_group_id:
+                individual_post_db.add_post(tag=tag, photo_id=message.photo[-1].file_id, content=text_user)
+
+            text_confirm_post = f'{text_user}'
+            await message.answer_photo(photo=message.photo[-1].file_id,
+                                       caption=text_confirm_post, parse_mode='html',
+                                       reply_markup=await create_confirm_post())
 
         elif message.video:
             if message.caption is not None:
@@ -222,6 +227,10 @@ async def confirm_create_post(message: Message, state: FSMContext):
             async with state.proxy() as data:
                 data['text'] = text_user
                 data['video'] = message.video.file_id
+                tag = data['tag']
+
+            if message.media_group_id:
+                individual_post_db.add_post(tag=tag, photo_id=message.video.file_id, content=text_user)
 
             text_confirm_post = f'{text_user}'
             await message.answer_video(video=message.video.file_id,
@@ -380,24 +389,39 @@ async def publication(callback: CallbackQuery, state: FSMContext):
         video = data.get('video')
         animation = data.get('animation')
         text = data['text']
+        tag = data['tag']
+
     await state.finish()
-    tag = await generate_random_tag_md5()
     # Добавления тега для последующей его отмены пользователем
-    post_db = PostDB()
-    post_db.post_add(user_id=callback.from_user.id, tag=tag, context=text)
-    await publication_post(tag=tag,
-                           user_id=callback.from_user.id,
-                           channels=channels,
-                           time=time,
-                           day=day,
-                           text_button=text_button,
-                           url_button=url_button,
-                           text=text,
-                           photo=photo, video=video, animation=animation)
-    await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
-                                  f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'
-                                  f'Данный тег необходим для последующей отмены поста', parse_mode='html')
-    await callback.message.delete()
+    individual_post_db = IndividualPostDB()
+    if not individual_post_db.exists_tag(tag=tag):
+        post_db = PostDB()
+        post_db.post_add(user_id=callback.from_user.id, tag=tag, context=text)
+        await publication_post(tag=tag,
+                               user_id=callback.from_user.id,
+                               channels=channels,
+                               time=time,
+                               day=day,
+                               text_button=text_button,
+                               url_button=url_button,
+                               text=text,
+                               photo=photo, video=video, animation=animation)
+        await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
+                                      f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'
+                                      f'Данный тег необходим для последующей отмены поста', parse_mode='html')
+        await callback.message.delete()
+    else:  # Отправка альбома
+        posts = individual_post_db.get_post_by_tag(tag=tag)
+        if int(day) == 99:  # Сегодня
+            job = CronJob(name=tag).day.at(time).go(send_album, tag=tag,
+                                                    channels=channels, posts=posts)
+        else:  # Остальные дни.
+            job = CronJob(name=tag).weekday(int(day)).at(time).go(send_album, tag=tag,
+                                                                  channels=channels, posts=posts)
+        msh.add_job(job)
+        await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
+                                      f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'
+                                      f'Данный тег необходим для последующей отмены поста', parse_mode='html')
 
 
 def register_handlers_create_individual_post():

@@ -9,6 +9,7 @@ from create_bot.bot import bot
 from databases.client import DonorPostDB
 from utils.create_cron import msh
 from utils.generate_random_tag import generate_random_tag_md5
+from log.create_logger import logger
 
 
 async def delete_messages(tag, message, type_time_auto_delete, interval_auto_delete):
@@ -88,14 +89,16 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                         elif video_id:
                             media_group.attach_video(video=video_id)
                 try:
-                    print(channels)
                     for channel in channels:
                         message = await bot.send_media_group(chat_id=channel, media=media_group)
+                        logger.debug('Успешная отправка альбмного донора-поста')
                         await create_cron_delete_message(message=message,
                                                          type_time_auto_delete=type_time_auto_delete,
                                                          interval_auto_delete=interval_auto_delete)
-                except Exception:
+                except Exception as ex:
                     traceback.print_exc()
+                    logger.warning(f'Возникла ошибка при отправке сообщения-альбома в доноре постов\n\n'
+                                   f'{ex}')
             # Отправка обычного сообщения
             else:
                 # del post

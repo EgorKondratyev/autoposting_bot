@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 
+from aiogram.types import MediaGroup
 from async_cron.job import CronJob
 from aiogram.utils.exceptions import BadRequest
 
@@ -147,6 +148,33 @@ async def send_video(tag, user_id: int, channels: list, text, text_button: str |
     msh.del_job(job_name=tag)
     post_db = PostDB()
     post_db.post_del(user_id=user_id, tag=tag)
+
+
+async def send_album(tag: str, channels: list, posts: list):
+    media_group = MediaGroup()
+    check_text = 0  # Текст добавляется лишь единожды, поэтому добавим такую переменную;)
+    for attribute in posts:
+        # tag = attribute[0]
+        photo_id = attribute[1]
+        video_id = attribute[2]
+        text = attribute[3]
+
+        if not check_text and text:
+            if photo_id:
+                media_group.attach_photo(photo=photo_id, caption=text)
+            elif video_id:
+                media_group.attach_video(video=video_id, caption=text)
+            check_text += 1
+        else:
+            if photo_id:
+                media_group.attach_photo(photo=photo_id)
+            elif video_id:
+                media_group.attach_video(video=video_id)
+
+    for channel in channels:
+        message = await bot.send_media_group(chat_id=channel, media=media_group)
+
+    msh.del_job(tag)
 
 
 async def publication_post(tag: str,

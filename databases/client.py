@@ -253,3 +253,50 @@ class DonorPostDB:
     def __del__(self):
         self.__cur.close()
         self.__base.close()
+
+
+class IndividualPostDB:
+    def __init__(self):
+        try:
+            self.__base = sqlite3.connect(PATH)
+            self.__cur = self.__base.cursor()
+            self.__cur.execute('''CREATE TABLE IF NOT EXISTS individual_posts(
+                tag TEXT,
+                photo_id TEXT,
+                video_id TEXT,
+                content TEXT
+            )''')
+            self.__base.commit()
+        except Exception as ex:
+            logger.warning(f'An error occurred with table individual post\n'
+                           f'{ex}')
+
+    def exists_tag(self, tag: str) -> bool:
+        self.__cur.execute('SELECT tag '
+                           'FROM individual_posts '
+                           'WHERE tag = ?',
+                           (tag, ))
+        return bool(len(self.__cur.fetchall()))
+
+    def add_post(self, tag: str, photo_id: str = None, video_id: str = None, content: str = None):
+        self.__cur.execute('INSERT INTO individual_posts(tag, photo_id, video_id, content) '
+                           'VALUES(?, ?, ?, ?)',
+                           (tag, photo_id, video_id, content))
+        self.__base.commit()
+
+    def get_post_by_tag(self, tag: str) -> list:
+        self.__cur.execute('SELECT * '
+                           'FROM individual_posts '
+                           'WHERE tag = ?',
+                           (tag, ))
+        return self.__cur.fetchall()
+
+    def del_post_by_tag(self, tag: str):
+        self.__cur.execute('DELETE FROM individual_posts '
+                           'WHERE tag = ?',
+                           (tag, ))
+        self.__base.commit()
+
+    def __del__(self):
+        self.__cur.close()
+        self.__base.close()
