@@ -24,7 +24,6 @@ async def create_keyboard_tagged_channels(channels: list | tuple, channels_tagge
     """
     Формирование InlineKeyboardMarkup помеченных каналов из channels_tagged на основе channels конкретного user_id
     :param channels:
-    :param user_id:
     :param channels_tagged: Помеченные каналы
     :return:
     """
@@ -53,12 +52,14 @@ async def create_keyboard_tagged_channels(channels: list | tuple, channels_tagge
 
 async def create_type_time_keyboard() -> InlineKeyboardMarkup:
     type_time_menu = InlineKeyboardMarkup(row_width=3)
-    types_times = ('Минуты', 'Часы', 'Дни')  # В последующем определяется в utilis -> publication_post_donor.py
+    # В последующем определяется в utilis -> publication_post_donor.py
+    types_times = ('Минуты', 'Часы', 'Дни')
     for type_time in types_times:
         time_button = InlineKeyboardButton(text=type_time, callback_data=f'type_time_{type_time}')
         type_time_menu.insert(time_button)
+    arbitrary_type_button = InlineKeyboardButton(text='Произвольный интервал', callback_data='type_time_arbitrary')
     stop_button = InlineKeyboardButton('🛑STOP🛑', callback_data='stop_fsm')
-    type_time_menu.add(stop_button)
+    type_time_menu.add(arbitrary_type_button).add(stop_button)
     return type_time_menu
 
 
@@ -92,3 +93,58 @@ async def delete_post_keyboard() -> InlineKeyboardMarkup:
     delete_post_button = InlineKeyboardButton(text='Удалить пост', callback_data=f'delete_post')
     delete_post_menu.insert(delete_post_button)
     return delete_post_menu
+
+
+async def create_confirm_keyboards(**kwargs) -> InlineKeyboardMarkup:
+    confirm_menu = InlineKeyboardMarkup(row_width=1)
+    add_description_button = InlineKeyboardButton('Добавить описание всем постам',
+                                                  callback_data='confirm_donor_add_description')
+    mix_posts_button = InlineKeyboardButton('Перемешать посты', callback_data='confirm_donor_mix_post')
+    add_urls_button = InlineKeyboardButton('Добавить кнопки к постам', callback_data='confirm_donor_add_urls')
+    if kwargs.get('auto_delete'):
+        auto_delete_posts_button = InlineKeyboardButton('Добавить авто удаление постов✅',
+                                                        callback_data='confirm_donor_auto_delete_posts_yes')
+    else:
+        auto_delete_posts_button = InlineKeyboardButton('Добавить авто удаление постов',
+                                                        callback_data='confirm_donor_auto_delete_posts')
+    confirm_button = InlineKeyboardButton('Начать публикацию🏄‍♂️', callback_data='confirm_donor_start_pub')
+    stop_button = InlineKeyboardButton('🛑STOP🛑', callback_data='stop_fsm')
+    confirm_menu.insert(add_description_button).insert(mix_posts_button).insert(add_urls_button).\
+        insert(auto_delete_posts_button).insert(confirm_button).add(stop_button)
+    return confirm_menu
+
+
+async def create_type_time_keyboard_for_delete_posts():
+    type_time_menu = InlineKeyboardMarkup(row_width=3)
+    types_times = ('Минуты', 'Часы', 'Дни')
+    for type_time in types_times:
+        time_button = InlineKeyboardButton(text=type_time, callback_data=f'autodelete_donor_type_time_{type_time}')
+        type_time_menu.insert(time_button)
+    return type_time_menu
+
+
+async def create_interval_keyboard_for_delete_post(type_time: str) -> InlineKeyboardMarkup:
+    interval_menu = InlineKeyboardMarkup(row_width=4)
+    snow = '🎅'
+    if type_time == 'Минуты':
+        minutes = ('5', '10', '15', '20', '25', '30', '35', '40', '45', '55')
+        number_snow = random.randint(0, len(minutes) - 1)
+        for i, minute in enumerate(minutes, 0):
+            if i == number_snow:
+                minute += snow
+            minute_button = InlineKeyboardButton(text=minute + ' мин',
+                                                 callback_data=f'autodelete_donor_interval_{minute}')
+            interval_menu.insert(minute_button)
+    elif type_time == 'Часы':
+        hours = ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18',
+                 '19', '20', '21', '22', '23')
+        for hour in hours:
+            hour_button = InlineKeyboardButton(text=hour + ' ч', callback_data=f'autodelete_donor_interval_{hour}')
+            interval_menu.insert(hour_button)
+    else:  # Дни
+        days = ('1', '2', '3', '4', '5')
+        for day in days:
+            day_button = InlineKeyboardButton(text=day + ' дня(-ень, -ней)',
+                                              callback_data=f'autodelete_donor_interval_{day}')
+            interval_menu.add(day_button)
+    return interval_menu

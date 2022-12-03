@@ -159,6 +159,7 @@ class PostDB:
 
 class DonorPostDB:
     # unique_id_media_file - уникальный ID файла, который мы получаем из message.file.file_unique_id
+    # group_media_id - ID группировки файлов
     def __init__(self):
         try:
             self.__base = sqlite3.connect(PATH)
@@ -172,7 +173,8 @@ class DonorPostDB:
                 content TEXT,
                 video_note TEXT,
                 unique_id_media_file TEXT,
-                user_id BIGINT
+                user_id BIGINT,
+                group_media_id TEXT
             )''')
             self.__base.commit()
         except Exception as ex:
@@ -180,16 +182,17 @@ class DonorPostDB:
                            f'{ex}')
 
     def add_post(self, tag: str, user_id: int, photo_id: str = None, video_id: str = None, animation_id: str = None,
-                 content: str = None, unique_id_media_file: str = None, video_note: str = None):
+                 content: str = None, unique_id_media_file: str = None, video_note: str = None,
+                 group_media_id: str = None):
         self.__cur.execute('INSERT INTO '
                            'donor_posts(tag, photo_id, '
                            'video_id, animation_id, '
                            'content, unique_id_media_file, '
-                           'video_note, user_id) '
+                           'video_note, user_id, group_media_id) '
                            'VALUES '
-                           '(?, ?, ?, ?, ?, ?, ?, ?)',
+                           '(?, ?, ?, ?, ?, ?, ?, ?, ?)',
                            (tag, photo_id, video_id, animation_id, content, unique_id_media_file, video_note,
-                            user_id))
+                            user_id, group_media_id))
         self.__base.commit()
 
     def get_posts_by_tag(self, tag: str):
@@ -204,6 +207,13 @@ class DonorPostDB:
                            'FROM donor_posts '
                            'WHERE user_id = ?',
                            (user_id, ))
+        return self.__cur.fetchall()
+
+    def get_posts_by_grop_media_id(self, group_media_id: int) -> list:
+        self.__cur.execute('SELECT * '
+                           'FROM donor_posts '
+                           'WHERE group_media_id = ?',
+                           (group_media_id, ))
         return self.__cur.fetchall()
 
     def del_post_by_unique_id_file(self, unique_id_media_file: str):
@@ -228,6 +238,12 @@ class DonorPostDB:
         self.__cur.execute('DELETE FROM donor_posts '
                            'WHERE pk = ?',
                            (pk, ))
+        self.__base.commit()
+
+    def del_post_by_group_media_id(self, group_media_id: int):
+        self.__cur.execute('DELETE FROM donor_posts '
+                           'WHERE group_media_id = ?',
+                           (group_media_id, ))
         self.__base.commit()
 
     def clear_table(self):

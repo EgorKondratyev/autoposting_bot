@@ -3,3 +3,4 @@ venv
 INFO.log
 WARN.log
 .idea/
+database.db
