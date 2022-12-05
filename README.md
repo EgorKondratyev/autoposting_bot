@@ -1,2 +1,2 @@
 # autoposting_bot
-This bot is designed for autoposting with deferred time in telegram channels
+With the help of this bot, you can create posts, which later set the posting interval in channels
