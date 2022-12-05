@@ -11,10 +11,12 @@ from databases.client import ChannelDB, DonorPostDB
 from handlers.stop_fsm import create_keyboard_stop_fsm
 from keyboards.inline.donor_posts import create_type_time_keyboard, create_keyboard_channels, \
     create_keyboard_tagged_channels, create_interval_keyboard, delete_post_keyboard, create_confirm_keyboards, \
-    create_interval_keyboard_for_delete_post, create_type_time_keyboard_for_delete_posts
+    create_interval_keyboard_for_delete_post, create_type_time_keyboard_for_delete_posts, create_add_additional_url, \
+    create_buttons_url
 from keyboards.reply.donor_post_keyboard import confirmation_donor_posts_menu
 from log.create_logger import logger
-from states.donor_posts import DonorPostsFSM, IntervalDeleteDonorPostFSM
+from states.donor_posts import DonorPostsFSM, IntervalDeleteDonorPostFSM, CreateDonorButtonsFSM, \
+    CreateDescriptionDonorFSM
 from utils.generate_random_tag import generate_random_tag_md5
 from utils.publication_post_donor import publication_post_donor
 
@@ -367,9 +369,14 @@ async def cancellation_auto_delete(callback: CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         del data['auto_delete_type_time']
         del data['auto_delete_interval']
+        buttons = data.get('buttons')
+        mix_post = data.get('mix_post')
+        add_description = data.get('add_description')
 
     await callback.answer('Авто удаление отменено')
-    await callback.message.edit_reply_markup(reply_markup=await create_confirm_keyboards())
+    await callback.message.edit_reply_markup(reply_markup=await create_confirm_keyboards(buttons=buttons,
+                                                                                         mix_post=mix_post,
+                                                                                         add_description=add_description))
 
 
 # @dp.callback_query_handler(Text(startswith='autodelete_donor_type_time_'),
@@ -387,23 +394,182 @@ async def get_interval_for_setting_auto_delete_posts(callback: CallbackQuery, st
 
 # @dp.callback_query_handler(Text(startswith='autodelete_donor_interval_'),
 #                            state=IntervalDeleteDonorPostFSM.get_interval)
-async def confirm_callback(callback: CallbackQuery, state: FSMContext):
+async def confirm_auto_delete(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     auto_delete_interval = callback.data[len('autodelete_donor_interval_'):]
     async with state.proxy() as data:
         tag = data['tag']
         data['auto_delete_interval'] = auto_delete_interval
+        buttons = data.get('buttons')
+        mix_post = data.get('mix_post')
+        add_description = data.get('add_description')
+
     post_donor_db = DonorPostDB()
     posts = post_donor_db.get_posts_by_tag(tag=tag)
     if posts:
         await callback.message.answer('Выбери дополнительные характеристики публикации (если таковые необходимы): ',
-                                      reply_markup=await create_confirm_keyboards(auto_delete='yes'))
+                                      reply_markup=await create_confirm_keyboards(auto_delete=auto_delete_interval,
+                                                                                  buttons=buttons,
+                                                                                  add_description=add_description,
+                                                                                  mix_post=mix_post))
         await DonorPostsFSM.confirm.set()
     else:
         await callback.message.answer('Прежде чем нажимать кнопку "Продолжить", '
                                       '<b>ты должен отправить мне хотя бы 1 пост</b>!\n\n'
                                       'Если ты хочешь остановить процесс, то нажми на кнопку "Остановить❌"',
                                       parse_mode='html')
+
+
+# @dp.callback_query_handler(Text(equals='confirm_donor_add_urls'),
+#                            state=[DonorPostsFSM.confirm, CreateDonorButtonsFSM.confirm])
+async def get_name_button(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer('Введи название кнопки: \n\n'
+                                  'Внимание! Для альбомов кнопки не будут добавлены')
+    await CreateDonorButtonsFSM.get_name.set()
+
+
+# @dp.message_handler(state=CreateDonorButtonsFSM.get_name)
+async def get_url_button(message: Message, state: FSMContext):
+    if len(message.text) < 50:
+        async with state.proxy() as data:
+            data['name_button'] = message.text
+
+        await message.answer('Введи url кнопки: ')
+        await CreateDonorButtonsFSM.get_url.set()
+    else:
+        await message.answer('В названии кнопки не может быть более 50 символов!\n\n'
+                             'Попробуй ещё раз или нажми кнопку стоп😴',
+                             reply_markup=create_keyboard_stop_fsm())
+
+
+# @dp.message_handler(state=CreateDonorButtonsFSM.get_url)
+async def set_button(message: Message, state: FSMContext):
+    """
+    Установка кнопок в state, а также уточнение хочет ли пользователь добавить ещё кнопки
+    :param message:
+    :param state:
+    :return:
+    """
+    async with state.proxy() as data:
+        name_button = data['name_button']
+        url_button = message.text
+        if data.get('buttons'):
+            data['buttons'].append({name_button: url_button})
+        else:
+            data['buttons'] = [{name_button: url_button}, ]
+
+    await message.answer('Хочешь ли ты добавить ещё одну кнопку?', reply_markup=await create_add_additional_url())
+    await CreateDonorButtonsFSM.confirm.set()
+
+
+# @dp.callback_query_handler(Text(equals='stop_donor_add_urls'), state=CreateDonorButtonsFSM.confirm)
+async def confirm_add_urls(callback: CallbackQuery, state: FSMContext):
+    """
+    Если пользователь подтвердил добавление кнопок, то выдаем ему меню по публикации постов из донора.
+    :param callback:
+    :param state:
+    :return:
+    """
+    async with state.proxy() as data:
+        auto_delete = data.get('auto_delete_interval')
+        buttons = data.get('buttons')
+        mix_post = data.get('mix_post')
+        add_description = data.get('add_description')
+
+    await callback.answer('Все кнопки успешно добавлены!')
+    await callback.message.answer('Выбери дополнительные характеристики публикации (если таковые необходимы): ',
+                                  reply_markup=await create_confirm_keyboards(auto_delete=auto_delete,
+                                                                              buttons=buttons,
+                                                                              add_description=add_description,
+                                                                              mix_post=mix_post))
+    await DonorPostsFSM.confirm.set()
+
+
+# @dp.callback_query_handler(Text(equals='confirm_donor_add_urls_yes'), state=DonorPostsFSM.confirm)
+async def cancellation_url_buttons(callback: CallbackQuery, state: FSMContext):
+    """
+    Удаление всех созданных кнопок перед публикацией.
+    :param callback:
+    :param state:
+    :return:
+    """
+    async with state.proxy() as data:
+        del data['buttons']
+        auto_delete = data.get('auto_delete_interval')
+        mix_post = data.get('mix_post')
+        add_description = data.get('add_description')
+
+    await callback.message.edit_reply_markup(reply_markup=await create_confirm_keyboards(auto_delete=auto_delete,
+                                                                                         add_description=add_description,
+                                                                                         mix_post=mix_post))
+    await callback.answer('Кнопки удалены')
+
+
+# @dp.callback_query_handler(Text(equals='confirm_donor_add_description'), state=DonorPostsFSM.confirm)
+async def get_description_for_all_donor_post(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer('Отправь мне описание, которое будет прикреплено ко всем постам: ')
+    await CreateDescriptionDonorFSM.get_description.set()
+
+
+# @dp.message_handler(state=CreateDescriptionDonorFSM.get_description)
+async def confirm_description(message: Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['add_description'] = message.text
+        auto_delete = data.get('auto_delete_interval')
+        mix_post = data.get('mix_post')
+        buttons = data.get('buttons')
+
+    await message.answer('Выбери дополнительные характеристики публикации (если таковые необходимы): ',
+                         reply_markup=await create_confirm_keyboards(auto_delete=auto_delete,
+                                                                     buttons=buttons,
+                                                                     add_description=message.text,
+                                                                     mix_post=mix_post))
+    await DonorPostsFSM.confirm.set()
+
+
+# @dp.callback_query_handler(Text(equals='confirm_donor_add_description_yes'), state=DonorPostsFSM.confirm)
+async def cancellation_description(callback: CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        del data['add_description']
+        auto_delete = data.get('auto_delete_interval')
+        mix_post = data.get('mix_post')
+        buttons = data.get('buttons')
+
+    await callback.answer('Описание успешно удалено')
+    await callback.message.edit_reply_markup(reply_markup=await create_confirm_keyboards(auto_delete=auto_delete,
+                                                                                         buttons=buttons,
+                                                                                         mix_post=mix_post))
+
+
+# @dp.callback_query_handler(Text(equals='confirm_donor_mix_post'), state=DonorPostsFSM.confirm)
+async def set_mix_post(callback: CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['mix_post'] = True
+        description = data.get('add_description')
+        auto_delete = data.get('auto_delete_interval')
+        buttons = data.get('buttons')
+
+    await callback.answer('Перемешивание постов установлено')
+    await callback.message.edit_reply_markup(reply_markup=await create_confirm_keyboards(auto_delete=auto_delete,
+                                                                                         buttons=buttons,
+                                                                                         mix_post=True,
+                                                                                         add_description=description))
+
+
+# @dp.callback_query_handler(Text(equals='confirm_donor_mix_post_yes'), state=DonorPostsFSM.confirm)
+async def cancellation_mix_post(callback: CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        del data['mix_post']
+        description = data.get('add_description')
+        auto_delete = data.get('auto_delete_interval')
+        buttons = data.get('buttons')
+
+    await callback.answer('Перемешивание удалено')
+    await callback.message.edit_reply_markup(reply_markup=await create_confirm_keyboards(auto_delete=auto_delete,
+                                                                                         buttons=buttons,
+                                                                                         add_description=description))
 
 
 # @dp.callback_query_handler(Text(equals='confirm_donor_start_pub'), state=DonorPostsFSM.confirm)
@@ -415,8 +581,13 @@ async def publication(callback: CallbackQuery, state: FSMContext):
             type_time = data['type_time']
             interval = data.get('interval')  # Если задан рандомный интервал, то здесь None.
             tag = data['tag']
+
+            # Параметры, которые устанавливаются из дополнительного меню.
             type_time_auto_delete = data.get('auto_delete_type_time')
             interval_auto_delete = data.get('auto_delete_interval')
+            buttons_dict = data.get('buttons')
+            description = data.get('add_description')
+            mix_post = data.get('mix_post')
 
             # Если был задан рандомный интервал, то считываем все необходимые данные
             first_type_time = data.get('first_type_time')
@@ -427,19 +598,40 @@ async def publication(callback: CallbackQuery, state: FSMContext):
         post_donor_db = DonorPostDB()
         posts = post_donor_db.get_posts_by_tag(tag=tag)
         if posts:
-            await state.finish()
+            try:
+                await state.finish()
+                if buttons_dict:  # Формируем кнопки, если таковые есть
+                    buttons = await create_buttons_url(buttons_dict)
+                else:
+                    buttons = None
+            except Exception as ex:
+                await callback.message.answer('Возникла ошибка на этапе формирования кнопок!\n\n'
+                                              'Убедись, что вводил все правильно и повтори действия.')
+                logger.warning(f'Возникла ошибка при подтверждении публикации (создание кнопок)\n'
+                               f'{ex}')
+                return
+
             messages = ['Комфортной работы🍫', 'Приятной работы🧃']
             await callback.message.answer('🚀')
             await callback.message.answer(f'Все посты успешно добавлены в очередь!\n\n'
                                           f'Количество добавленных постов в очередь: <b>{len(posts)}</b>\n\n'
+                                          f'Тег публикаций: {tag}\n\n'
                                           f'<i>{random.choice(messages)}</i>',
                                           parse_mode='html',
                                           reply_markup=ReplyKeyboardRemove())
-            await publication_post_donor(tag=tag, type_time=type_time, interval=interval, channels=channels_id,
-                                         type_time_auto_delete=type_time_auto_delete,
-                                         interval_auto_delete=interval_auto_delete,
-                                         first_type_time=first_type_time, first_interval=first_interval,
-                                         second_type_time=second_type_time, second_interval=second_interval)
+            status_pub = await publication_post_donor(tag=tag, type_time=type_time, interval=interval,
+                                                      channels=channels_id,
+                                                      type_time_auto_delete=type_time_auto_delete,
+                                                      interval_auto_delete=interval_auto_delete,
+                                                      first_type_time=first_type_time, first_interval=first_interval,
+                                                      second_type_time=second_type_time,
+                                                      second_interval=second_interval,
+                                                      buttons=buttons,
+                                                      description=description,
+                                                      mix_post=mix_post)
+            if status_pub == 2:
+                await callback.message.answer('Внимание! Посты не были поставлены на публикацию, так как '
+                                              'был нарушен синтаксис произвольного интервала!')
     except Exception as ex:
         logger.warning(f'Произошла ошибка в обработчике публикации\n\n'
                        f'{ex}')
@@ -465,6 +657,22 @@ def register_handlers_donor_posts():
     dp.register_message_handler(set_posts, state=DonorPostsFSM.get_posts, content_types='any')
     dp.register_callback_query_handler(delete_donor_post_before_publication,
                                        Text(equals='delete_post'), state=DonorPostsFSM.get_posts)
-    dp.register_callback_query_handler(confirm_callback, Text(startswith='autodelete_donor_interval_'),
+    dp.register_callback_query_handler(confirm_auto_delete, Text(startswith='autodelete_donor_interval_'),
                                        state=IntervalDeleteDonorPostFSM.get_interval)
+    dp.register_callback_query_handler(get_name_button, Text(equals='confirm_donor_add_urls'),
+                                       state=[DonorPostsFSM.confirm, CreateDonorButtonsFSM.confirm])
+    dp.register_message_handler(get_url_button, state=CreateDonorButtonsFSM.get_name)
+    dp.register_message_handler(set_button, state=CreateDonorButtonsFSM.get_url)
+    dp.register_callback_query_handler(confirm_add_urls, Text(equals='stop_donor_add_urls'),
+                                       state=CreateDonorButtonsFSM.confirm)
+    dp.register_callback_query_handler(cancellation_url_buttons, Text(equals='confirm_donor_add_urls_yes'),
+                                       state=DonorPostsFSM.confirm)
+    dp.register_callback_query_handler(get_description_for_all_donor_post, Text(equals='confirm_donor_add_description'),
+                                       state=DonorPostsFSM.confirm)
+    dp.register_message_handler(confirm_description, state=CreateDescriptionDonorFSM.get_description)
+    dp.register_callback_query_handler(cancellation_description, Text(equals='confirm_donor_add_description_yes'),
+                                       state=DonorPostsFSM.confirm)
+    dp.register_callback_query_handler(set_mix_post, Text(equals='confirm_donor_mix_post'), state=DonorPostsFSM.confirm)
+    dp.register_callback_query_handler(cancellation_mix_post, Text(equals='confirm_donor_mix_post_yes'),
+                                       state=DonorPostsFSM.confirm)
     dp.register_callback_query_handler(publication, Text(equals='confirm_donor_start_pub'), state=DonorPostsFSM.confirm)

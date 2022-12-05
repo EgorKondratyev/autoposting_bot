@@ -97,10 +97,21 @@ async def delete_post_keyboard() -> InlineKeyboardMarkup:
 
 async def create_confirm_keyboards(**kwargs) -> InlineKeyboardMarkup:
     confirm_menu = InlineKeyboardMarkup(row_width=1)
-    add_description_button = InlineKeyboardButton('Добавить описание всем постам',
-                                                  callback_data='confirm_donor_add_description')
-    mix_posts_button = InlineKeyboardButton('Перемешать посты', callback_data='confirm_donor_mix_post')
-    add_urls_button = InlineKeyboardButton('Добавить кнопки к постам', callback_data='confirm_donor_add_urls')
+    if kwargs.get('add_description'):
+        add_description_button = InlineKeyboardButton('Добавить описание всем постам✅',
+                                                      callback_data='confirm_donor_add_description_yes')
+    else:
+        add_description_button = InlineKeyboardButton('Добавить описание всем постам',
+                                                      callback_data='confirm_donor_add_description')
+    if kwargs.get('mix_post'):
+        mix_posts_button = InlineKeyboardButton('Перемешать посты✅', callback_data='confirm_donor_mix_post_yes')
+    else:
+        mix_posts_button = InlineKeyboardButton('Перемешать посты', callback_data='confirm_donor_mix_post')
+    if kwargs.get('buttons'):
+        add_urls_button = InlineKeyboardButton('Добавить кнопки к постам✅',
+                                               callback_data='confirm_donor_add_urls_yes')
+    else:
+        add_urls_button = InlineKeyboardButton('Добавить кнопки к постам', callback_data='confirm_donor_add_urls')
     if kwargs.get('auto_delete'):
         auto_delete_posts_button = InlineKeyboardButton('Добавить авто удаление постов✅',
                                                         callback_data='confirm_donor_auto_delete_posts_yes')
@@ -112,6 +123,33 @@ async def create_confirm_keyboards(**kwargs) -> InlineKeyboardMarkup:
     confirm_menu.insert(add_description_button).insert(mix_posts_button).insert(add_urls_button).\
         insert(auto_delete_posts_button).insert(confirm_button).add(stop_button)
     return confirm_menu
+
+
+async def create_add_additional_url():
+    """
+    Уточняет: хочет ли пользователь добавить ещё одну кнопку к донорам.
+    :return:
+    """
+    url_menu = InlineKeyboardMarkup(row_width=2)
+    yes_add = InlineKeyboardButton(text='Добавить', callback_data='confirm_donor_add_urls')
+    no_add = InlineKeyboardButton(text='Нет', callback_data='stop_donor_add_urls')
+    url_menu.insert(yes_add).insert(no_add)
+    return url_menu
+
+
+async def create_buttons_url(buttons: list[dict]) -> InlineKeyboardMarkup:
+    """
+    Создает InlineKeyboardMarkup из buttons (buttons формируем на этапе дополнительного меню).
+    :param buttons: [{name_button: url_button}, ..., {name_button: url_button}]
+    :return:
+    """
+    menu_buttons = InlineKeyboardMarkup(row_width=1)
+    for button in buttons:
+        for name_button, url in button.items():
+            url_button = InlineKeyboardButton(text=name_button, url=url)
+            menu_buttons.insert(url_button)
+
+    return menu_buttons
 
 
 async def create_type_time_keyboard_for_delete_posts():

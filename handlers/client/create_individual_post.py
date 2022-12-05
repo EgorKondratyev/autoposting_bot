@@ -12,7 +12,8 @@ from create_bot.bot import dp
 from databases.client import ChannelDB, PostDB, IndividualPostDB
 from handlers.stop_fsm import create_keyboard_stop_fsm
 from keyboards.inline.individual_post import create_keyboard_channels, create_keyboard_time_24_hours, \
-    create_keyboard_tagged_channels, create_keyboard_day, create_confirm_post, create_url_menu, create_button_for_post
+    create_keyboard_tagged_channels, create_keyboard_day, create_confirm_post, create_url_menu, create_button_for_post,\
+    create_interval_auto_delete, create_type_interval_auto_delete
 from states.individual_post import IndividualPostFSM
 from log.create_logger import logger
 from utils.publication_post_individual import publication_post, send_album
@@ -265,6 +266,47 @@ async def confirm_create_post(message: Message, state: FSMContext):
         traceback.print_exc()
 
 
+# @dp.callback_query_handler(Text(equals='confirm_individual_auto_delete'), state=IndividualPostFSM.confirm)
+async def get_type_time_auto_delete(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer('Выбери тип интервала для настройки "авто удаления" поста: ',
+                                  reply_markup=await create_type_interval_auto_delete())
+    await IndividualPostFSM.get_type_time.set()
+
+
+# @dp.callback_query_handler(Text(startswith='autodelete_individual_type_time_'), state=IndividualPostFSM.get_type_time)
+async def get_interval_auto_delete(callback: CallbackQuery, state: FSMContext):
+    type_time = callback.data[len('autodelete_individual_type_time_'):]
+    async with state.proxy() as data:
+        data['type_time_auto_delete'] = type_time
+
+    text_type_time = '<b>Выбери интервал</b>, с которым будут публиковаться посты: \n\n'
+    if type_time == 'Минуты':
+        text_type_time += 'Раз в 5 минут, каждые 10 минут'
+    elif type_time == 'Часы':
+        text_type_time += 'Раз в 2 часа, каждые 3 часа'
+    else:
+        text_type_time += 'Раз в день, раз в 3 дня'
+    await callback.message.edit_text(text_type_time,
+                                     reply_markup=await create_interval_auto_delete(type_time),
+                                     parse_mode='html')
+    await IndividualPostFSM.get_interval.set()
+
+
+@dp.callback_query_handler(Text(startswith='autodelete_individual_interval_'), state=IndividualPostFSM.get_interval)
+async def set_interval(callback: CallbackQuery, state: FSMContext):
+    interval = callback.data[len('autodelete_individual_interval_'):]
+    async with state.proxy() as data:
+        data['interval_auto_delete'] = interval
+        type_time = data['type_time_auto_delete']
+
+    await callback.message.delete()
+    await callback.message.answer(f'Настройки авто удаления: \n\n'
+                                  f'<b>Тип интервала:</b> {type_time}  |  <b>Интервал:</b> {interval}',
+                                  parse_mode='html')
+    await IndividualPostFSM.confirm.set()
+
+
 # @dp.callback_query_handler(Text(equals='confirm_individual_preview'), state=IndividualPostFSM.confirm)
 async def preview_post(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
@@ -391,6 +433,10 @@ async def publication(callback: CallbackQuery, state: FSMContext):
         text = data['text']
         tag = data['tag']
 
+        # auto delete:
+        type_time_auto_delete = data.get('type_time_auto_delete')
+        interval_auto_delete = data.get('interval_auto_delete')
+
     await state.finish()
     # Добавления тега для последующей его отмены пользователем
     individual_post_db = IndividualPostDB()
@@ -405,7 +451,8 @@ async def publication(callback: CallbackQuery, state: FSMContext):
                                text_button=text_button,
                                url_button=url_button,
                                text=text,
-                               photo=photo, video=video, animation=animation)
+                               photo=photo, video=video, animation=animation,
+                               type_time_auto_delete=type_time_auto_delete, interval_auto_delete=interval_auto_delete)
         await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
                                       f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'
                                       f'Данный тег необходим для последующей отмены поста', parse_mode='html')
@@ -414,10 +461,14 @@ async def publication(callback: CallbackQuery, state: FSMContext):
         posts = individual_post_db.get_post_by_tag(tag=tag)
         if int(day) == 99:  # Сегодня
             job = CronJob(name=tag).day.at(time).go(send_album, tag=tag,
-                                                    channels=channels, posts=posts)
+                                                    channels=channels, posts=posts,
+                                                    type_time_auto_delete=type_time_auto_delete,
+                                                    interval_auto_delete=interval_auto_delete)
         else:  # Остальные дни.
             job = CronJob(name=tag).weekday(int(day)).at(time).go(send_album, tag=tag,
-                                                                  channels=channels, posts=posts)
+                                                                  channels=channels, posts=posts,
+                                                                  type_time_auto_delete=type_time_auto_delete,
+                                                                  interval_auto_delete=interval_auto_delete)
         msh.add_job(job)
         await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
                                       f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'
@@ -437,6 +488,10 @@ def register_handlers_create_individual_post():
     dp.register_message_handler(get_url_for_button, state=IndividualPostFSM.get_text_for_button)
     dp.register_message_handler(get_post, state=IndividualPostFSM.get_url_for_button)
     dp.register_message_handler(confirm_create_post, state=IndividualPostFSM.get_post, content_types='any')
+    dp.register_callback_query_handler(get_type_time_auto_delete, Text(equals='confirm_individual_auto_delete'),
+                                       state=IndividualPostFSM.confirm)
+    dp.register_callback_query_handler(get_interval_auto_delete, Text(startswith='autodelete_individual_type_time_'),
+                                       state=IndividualPostFSM.get_type_time)
     dp.register_callback_query_handler(preview_post, Text(equals='confirm_individual_preview'),
                                        state=IndividualPostFSM.confirm)
     dp.register_callback_query_handler(get_time_before_publication, Text(equals='confirm_individual_time'),

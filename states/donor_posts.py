@@ -13,3 +13,13 @@ class DonorPostsFSM(StatesGroup):
 class IntervalDeleteDonorPostFSM(StatesGroup):
     get_type_time = State()
     get_interval = State()
+
+
+class CreateDonorButtonsFSM(StatesGroup):
+    get_name = State()
+    get_url = State()
+    confirm = State()
+
+
+class CreateDescriptionDonorFSM(StatesGroup):
+    get_description = State()

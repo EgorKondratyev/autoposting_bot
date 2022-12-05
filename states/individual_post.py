@@ -10,3 +10,6 @@ class IndividualPostFSM(StatesGroup):
     get_url_for_button = State()
     get_post = State()
     confirm = State()
+    # For auto delete
+    get_type_time = State()
+    get_interval = State()
