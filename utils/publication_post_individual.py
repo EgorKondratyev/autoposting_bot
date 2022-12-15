@@ -71,20 +71,22 @@ async def send_text(tag, user_id: int, channels: list, text: str, text_button: s
         for channel in channels:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                message = await bot.send_message(chat_id=channel, text=text, reply_markup=button_link)
+                message = await bot.send_message(chat_id=channel, text=text, reply_markup=button_link,
+                                                 parse_mode='html')
                 await create_cron_delete_message(message=message,
                                                  type_time_auto_delete=type_time_auto_delete,
                                                  interval_auto_delete=interval_auto_delete)
                 await asyncio.sleep(1)
             except BadRequest:
                 await bot.send_message(chat_id=user_id, text=f'Возникла ошибка с одним из постов, невалидный '
-                                                             f'url: {url_button}')
+                                                             f'url: {url_button}',
+                                       parse_mode='html')
                 logger.warning(f'Возникла ошибка с текстовым постом, неверный url: {url_button}\n'
                                f'User id: {user_id}')
                 traceback.print_exc()
     else:
         for channel in channels:
-            message = await bot.send_message(chat_id=channel, text=text)
+            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html')
             await create_cron_delete_message(message=message,
                                              type_time_auto_delete=type_time_auto_delete,
                                              interval_auto_delete=interval_auto_delete)
@@ -116,7 +118,7 @@ async def send_photo(tag, user_id: int, channels: list, text, text_button: str |
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
                 message = await bot.send_photo(chat_id=channel, caption=text, photo=photo_path,
-                                               reply_markup=button_link)
+                                               reply_markup=button_link, parse_mode='html')
                 await create_cron_delete_message(message=message,
                                                  type_time_auto_delete=type_time_auto_delete,
                                                  interval_auto_delete=interval_auto_delete)
@@ -129,7 +131,7 @@ async def send_photo(tag, user_id: int, channels: list, text, text_button: str |
                 traceback.print_exc()
     else:
         for channel in channels:
-            message = await bot.send_photo(chat_id=channel, caption=text, photo=photo_path)
+            message = await bot.send_photo(chat_id=channel, caption=text, photo=photo_path, parse_mode='html')
             await create_cron_delete_message(message=message,
                                              type_time_auto_delete=type_time_auto_delete,
                                              interval_auto_delete=interval_auto_delete)
@@ -161,7 +163,7 @@ async def send_animation(tag, user_id: int, channels: list, text, text_button: s
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
                 message = await bot.send_animation(animation=animation_path, chat_id=channel, caption=text,
-                                                   reply_markup=button_link)
+                                                   reply_markup=button_link, parse_mode='html')
                 await create_cron_delete_message(message=message,
                                                  type_time_auto_delete=type_time_auto_delete,
                                                  interval_auto_delete=interval_auto_delete)
@@ -174,7 +176,8 @@ async def send_animation(tag, user_id: int, channels: list, text, text_button: s
                 traceback.print_exc()
     else:
         for channel in channels:
-            message = await bot.send_animation(chat_id=channel, caption=text, animation=animation_path)
+            message = await bot.send_animation(chat_id=channel, caption=text, animation=animation_path,
+                                               parse_mode='html')
             await create_cron_delete_message(message=message,
                                              type_time_auto_delete=type_time_auto_delete,
                                              interval_auto_delete=interval_auto_delete)
@@ -205,7 +208,8 @@ async def send_video(tag, user_id: int, channels: list, text, text_button: str |
         for channel in channels:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                message = await bot.send_video(chat_id=channel, caption=text, video=video_path, reply_markup=button_link)
+                message = await bot.send_video(chat_id=channel, caption=text, video=video_path, reply_markup=button_link,
+                                               parse_mode='html')
                 await create_cron_delete_message(message=message,
                                                  type_time_auto_delete=type_time_auto_delete,
                                                  interval_auto_delete=interval_auto_delete)
@@ -217,7 +221,7 @@ async def send_video(tag, user_id: int, channels: list, text, text_button: str |
                 traceback.print_exc()
     else:
         for channel in channels:
-            message = await bot.send_video(chat_id=channel, caption=text, video=video_path)
+            message = await bot.send_video(chat_id=channel, caption=text, video=video_path, parse_mode='html')
             await create_cron_delete_message(message=message,
                                              type_time_auto_delete=type_time_auto_delete,
                                              interval_auto_delete=interval_auto_delete)
@@ -238,9 +242,9 @@ async def send_album(tag: str, channels: list, posts: list, type_time_auto_delet
 
         if not check_text and text:
             if photo_id:
-                media_group.attach_photo(photo=photo_id, caption=text)
+                media_group.attach_photo(photo=photo_id, caption=text, parse_mode='html')
             elif video_id:
-                media_group.attach_video(video=video_id, caption=text)
+                media_group.attach_video(video=video_id, caption=text, parse_mode='html')
             check_text += 1
         else:
             if photo_id:

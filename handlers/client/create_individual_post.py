@@ -204,7 +204,10 @@ async def confirm_create_post(message: Message, state: FSMContext):
         individual_post_db = IndividualPostDB()
         if message.photo:
             if message.caption is not None:
-                text_user = message.caption
+                if message.html_text:
+                    text_user = message.html_text
+                else:
+                    text_user = message.caption
             else:
                 text_user = ''
             async with state.proxy() as data:
@@ -222,7 +225,10 @@ async def confirm_create_post(message: Message, state: FSMContext):
 
         elif message.video:
             if message.caption is not None:
-                text_user = message.caption
+                if message.html_text:
+                    text_user = message.html_text
+                else:
+                    text_user = message.caption
             else:
                 text_user = ''
             async with state.proxy() as data:
@@ -240,7 +246,10 @@ async def confirm_create_post(message: Message, state: FSMContext):
 
         elif message.animation:
             if message.caption is not None:
-                text_user = message.caption
+                if message.html_text:
+                    text_user = message.html_text
+                else:
+                    text_user = message.caption
             else:
                 text_user = ''
             async with state.proxy() as data:
@@ -253,7 +262,10 @@ async def confirm_create_post(message: Message, state: FSMContext):
                                            reply_markup=await create_confirm_post())
 
         elif message.text is not None:
-            text_user = message.text
+            if message.html_text:
+                text_user = message.html_text
+            else:
+                text_user = message.text
             async with state.proxy() as data:
                 data['text'] = text_user
 
@@ -322,7 +334,8 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
         if text_button:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                await callback.message.answer_photo(photo=photo, caption=text, reply_markup=button_link)
+                await callback.message.answer_photo(photo=photo, caption=text, reply_markup=button_link,
+                                                    parse_mode='html')
             except BadRequest:
                 await callback.message.answer('Невалидная кнопка, прикрепленная к посту (вероятнее всего '
                                               'неверно указан url)\n\n'
@@ -330,12 +343,13 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
                 await state.finish()
                 await callback.message.answer('Процесс успешно остановлен')
         else:
-            await callback.message.answer_photo(photo=photo, caption=text)
+            await callback.message.answer_photo(photo=photo, caption=text, parse_mode='html')
     elif video:
         if text_button:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                await callback.message.answer_video(video=video, caption=text, reply_markup=button_link)
+                await callback.message.answer_video(video=video, caption=text, reply_markup=button_link,
+                                                    parse_mode='html')
             except BadRequest:
                 await callback.message.answer('Невалидная кнопка, прикрепленная к посту (вероятнее всего '
                                               'неверно указан url)\n\n'
@@ -343,13 +357,13 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
                 await state.finish()
                 await callback.message.answer('Процесс успешно остановлен')
         else:
-            await callback.message.answer_video(video=video, caption=text)
+            await callback.message.answer_video(video=video, caption=text, parse_mode='html')
     elif animation:
         if text_button:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
                 await callback.message.answer_animation(animation=animation, caption=text,
-                                                        reply_markup=button_link)
+                                                        reply_markup=button_link, parse_mode='html')
             except BadRequest:
                 await callback.message.answer('Невалидная кнопка, прикрепленная к посту (вероятнее всего '
                                               'неверно указан url)\n\n'
@@ -357,12 +371,12 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
                 await state.finish()
                 await callback.message.answer('Процесс успешно остановлен')
         else:
-            await callback.message.answer_animation(animation=animation, caption=text)
+            await callback.message.answer_animation(animation=animation, caption=text, parse_mode='html')
     else:
         if text_button:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                await callback.message.answer(text, reply_markup=button_link)
+                await callback.message.answer(text, reply_markup=button_link, parse_mode='html')
             except BadRequest:
                 await callback.message.answer('Невалидная кнопка, прикрепленная к посту (вероятнее всего '
                                               'неверно указан url)\n\n'
@@ -370,7 +384,7 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
                 await state.finish()
                 await callback.message.answer('Процесс успешно остановлен')
         else:
-            await callback.message.answer(text)
+            await callback.message.answer(text, parse_mode='html')
 
 
 # @dp.callback_query_handler(Text(equals='confirm_individual_time'), state=IndividualPostFSM.confirm)

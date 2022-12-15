@@ -61,7 +61,8 @@ async def create_cron_delete_message(message, type_time_auto_delete, interval_au
 
 
 async def send_message(tag: str, channels: list, type_time_auto_delete: str, interval_auto_delete: str,
-                       buttons: InlineKeyboardMarkup | None, description: str | None, mix_post: bool | None):
+                       buttons: InlineKeyboardMarkup | None, description: str | None, mix_post: bool | None,
+                       delete_text: bool | None):
     post_donor_db = DonorPostDB()
     posts = post_donor_db.get_posts_by_tag(tag=tag)
     if mix_post:
@@ -76,8 +77,10 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
             video_id = attribute_post[3]
             animation_id = attribute_post[4]
             text = attribute_post[5]
-            if description:
+            if description and not delete_text:
                 text += f'\n\n{description}'
+            elif delete_text:
+                text = description
             video_note = attribute_post[6]
             group_media_id = attribute_post[9]
             # Отправка альбома
@@ -91,14 +94,16 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                     photo_id = attribute_post_group[2]
                     video_id = attribute_post_group[3]
                     text = attribute_post_group[5]
-                    if description:
+                    if description and not delete_text:
                         text += f'\n\n{description}'
+                    elif delete_text:
+                        text = description
                     # Добавляем текст к альбому, если таковой есть
                     if not check_text and text:
                         if photo_id:
-                            media_group.attach_photo(photo=photo_id, caption=text)
+                            media_group.attach_photo(photo=photo_id, caption=text, parse_mode='html')
                         elif video_id:
-                            media_group.attach_video(video=video_id, caption=text)
+                            media_group.attach_video(video=video_id, caption=text, parse_mode='html')
                         check_text += 1
                     else:
                         if photo_id:
@@ -125,9 +130,10 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                     for channel in channels:
                         if buttons:
                             message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text,
-                                                           reply_markup=buttons)
+                                                           reply_markup=buttons, parse_mode='html')
                         else:
-                            message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text)
+                            message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text,
+                                                           parse_mode='html')
 
                         await create_cron_delete_message(message=message,
                                                          type_time_auto_delete=type_time_auto_delete,
@@ -136,9 +142,10 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                     for channel in channels:
                         if buttons:
                             message = await bot.send_video(chat_id=channel, video=video_id, caption=text,
-                                                           reply_markup=buttons)
+                                                           reply_markup=buttons, parse_mode='html')
                         else:
-                            message = await bot.send_video(chat_id=channel, video=video_id, caption=text)
+                            message = await bot.send_video(chat_id=channel, video=video_id, caption=text,
+                                                           parse_mode='html')
 
                         await create_cron_delete_message(message=message,
                                                          type_time_auto_delete=type_time_auto_delete,
@@ -147,9 +154,10 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                     for channel in channels:
                         if buttons:
                             message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text,
-                                                               reply_markup=buttons)
+                                                               reply_markup=buttons, parse_mode='html')
                         else:
-                            message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text)
+                            message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text,
+                                                               parse_mode='html')
                         await create_cron_delete_message(message=message,
                                                          type_time_auto_delete=type_time_auto_delete,
                                                          interval_auto_delete=interval_auto_delete)
@@ -166,9 +174,10 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                 else:  # text
                     for channel in channels:
                         if buttons:
-                            message = await bot.send_message(chat_id=channel, text=text, reply_markup=buttons)
+                            message = await bot.send_message(chat_id=channel, text=text, reply_markup=buttons,
+                                                             parse_mode='html')
                         else:
-                            message = await bot.send_message(chat_id=channel, text=text)
+                            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html')
                         await create_cron_delete_message(message=message,
                                                          type_time_auto_delete=type_time_auto_delete,
                                                          interval_auto_delete=interval_auto_delete)
@@ -189,9 +198,11 @@ async def publication_post_donor(tag: str,
                                  second_interval: str,
                                  buttons: InlineKeyboardMarkup | None,
                                  description: str | None,
-                                 mix_post: bool | None):
+                                 mix_post: bool | None,
+                                 delete_text: bool | None):
     """
     Публикация постов из канала донора в каналы, которые указал пользователь.
+    :param delete_text:
     :param mix_post:
     :param description:
     :param buttons: Кнопки, прикрепляемые к постам.
@@ -214,17 +225,20 @@ async def publication_post_donor(tag: str,
                                                                type_time_auto_delete=type_time_auto_delete,
                                                                interval_auto_delete=interval_auto_delete,
                                                                buttons=buttons,
-                                                               description=description, mix_post=mix_post)
+                                                               description=description, mix_post=mix_post,
+                                                               delete_text=delete_text)
     elif type_time == 'Часы':
         job = CronJob(name=tag).every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
                                                              type_time_auto_delete=type_time_auto_delete,
                                                              interval_auto_delete=interval_auto_delete, buttons=buttons,
-                                                             description=description, mix_post=mix_post)
+                                                             description=description, mix_post=mix_post,
+                                                             delete_text=delete_text)
     elif type_time == 'Дни':
         job = CronJob(name=tag).every(int(interval)).day.go(send_message, tag=tag, channels=channels,
                                                             type_time_auto_delete=type_time_auto_delete,
                                                             interval_auto_delete=interval_auto_delete, buttons=buttons,
-                                                            description=description, mix_post=mix_post)
+                                                            description=description, mix_post=mix_post,
+                                                            delete_text=delete_text)
     else:  # Произвольный интервал, формирование
         if first_type_time == 'м' and second_type_time == 'м':  # 1
             interval = random.randint(int(first_interval), int(second_interval))
@@ -232,21 +246,21 @@ async def publication_post_donor(tag: str,
                                                               type_time_auto_delete=type_time_auto_delete,
                                                               interval_auto_delete=interval_auto_delete,
                                                               buttons=buttons, description=description,
-                                                              mix_post=mix_post)
+                                                              mix_post=mix_post, delete_text=delete_text)
         elif first_type_time == 'ч' and second_type_time == 'ч':  # 2
             interval = random.randint(int(first_interval), int(second_interval))
             job = CronJob(name=tag).every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
                                                                  type_time_auto_delete=type_time_auto_delete,
                                                                  interval_auto_delete=interval_auto_delete,
                                                                  buttons=buttons, description=description,
-                                                                 mix_post=mix_post)
+                                                                 mix_post=mix_post, delete_text=delete_text)
         elif first_type_time == 'д' and second_type_time == 'д':  # 3
             interval = random.randint(int(first_interval), int(second_interval))
             job = CronJob(name=tag).every(int(interval)).day.go(send_message, tag=tag, channels=channels,
                                                                 type_time_auto_delete=type_time_auto_delete,
                                                                 interval_auto_delete=interval_auto_delete,
                                                                 buttons=buttons, description=description,
-                                                                mix_post=mix_post)
+                                                                mix_post=mix_post, delete_text=delete_text)
         elif first_type_time == 'м' and second_type_time == 'д':  # 4
             days_in_minutes = int(second_interval) * 1440
             interval = random.randint(int(first_interval), days_in_minutes)
@@ -254,7 +268,7 @@ async def publication_post_donor(tag: str,
                                                               type_time_auto_delete=type_time_auto_delete,
                                                               interval_auto_delete=interval_auto_delete,
                                                               buttons=buttons, description=description,
-                                                              mix_post=mix_post)
+                                                              mix_post=mix_post, delete_text=delete_text)
         elif first_type_time == 'м' and second_type_time == 'ч':  # 5
             hours_in_minutes = int(second_interval) * 60
             interval = random.randint(int(first_interval), hours_in_minutes)
@@ -262,7 +276,7 @@ async def publication_post_donor(tag: str,
                                                               type_time_auto_delete=type_time_auto_delete,
                                                               interval_auto_delete=interval_auto_delete,
                                                               buttons=buttons, description=description,
-                                                              mix_post=mix_post)
+                                                              mix_post=mix_post, delete_text=delete_text)
         elif first_type_time == 'ч' and second_type_time == 'д':  # 6
             days_in_hours = int(second_interval) * 24
             interval = random.randint(int(first_interval), days_in_hours)
@@ -270,7 +284,7 @@ async def publication_post_donor(tag: str,
                                                                  type_time_auto_delete=type_time_auto_delete,
                                                                  interval_auto_delete=interval_auto_delete,
                                                                  buttons=buttons, description=description,
-                                                                 mix_post=mix_post)
+                                                                 mix_post=mix_post, delete_text=delete_text)
         else:
             return 2
     msh.add_job(job)

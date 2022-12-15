@@ -97,6 +97,12 @@ async def delete_post_keyboard() -> InlineKeyboardMarkup:
 
 async def create_confirm_keyboards(**kwargs) -> InlineKeyboardMarkup:
     confirm_menu = InlineKeyboardMarkup(row_width=1)
+    if kwargs.get('delete_text'):
+        add_delete_text_post_button = InlineKeyboardButton('Удалить текст доноров✅',
+                                                           callback_data='confirm_donor_delete_text_yes')
+    else:
+        add_delete_text_post_button = InlineKeyboardButton('Удалить текст доноров',
+                                                           callback_data='confirm_donor_delete_text')
     if kwargs.get('add_description'):
         add_description_button = InlineKeyboardButton('Добавить описание всем постам✅',
                                                       callback_data='confirm_donor_add_description_yes')
@@ -120,8 +126,8 @@ async def create_confirm_keyboards(**kwargs) -> InlineKeyboardMarkup:
                                                         callback_data='confirm_donor_auto_delete_posts')
     confirm_button = InlineKeyboardButton('Начать публикацию🏄‍♂️', callback_data='confirm_donor_start_pub')
     stop_button = InlineKeyboardButton('🛑STOP🛑', callback_data='stop_fsm')
-    confirm_menu.insert(add_description_button).insert(mix_posts_button).insert(add_urls_button).\
-        insert(auto_delete_posts_button).insert(confirm_button).add(stop_button)
+    confirm_menu.insert(add_delete_text_post_button).insert(add_description_button).insert(mix_posts_button).\
+        insert(add_urls_button).insert(auto_delete_posts_button).insert(confirm_button).add(stop_button)
     return confirm_menu
 
 
