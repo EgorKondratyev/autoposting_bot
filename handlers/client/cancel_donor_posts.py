@@ -53,11 +53,11 @@ async def cancel_donor(message: Message, state: FSMContext):
     if message.text == 'DELETE JOB':
         async with state.proxy() as data:
             job_tag = data['tag']
-        msh.del_job(job_name=job_tag)
         post_donor_db = DonorPostDB()
         post_donor_db.del_post_by_tag(tag=job_tag)
         await state.finish()
         await message.answer('Задача успешно снята с очереди')
+        msh.del_job(job_name=job_tag)
     else:
         await state.finish()
         await message.answer('Операция остановлена')

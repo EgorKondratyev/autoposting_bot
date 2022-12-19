@@ -12,7 +12,7 @@ from handlers.stop_fsm import create_keyboard_stop_fsm
 from keyboards.inline.donor_posts import create_type_time_keyboard, create_keyboard_channels, \
     create_keyboard_tagged_channels, create_interval_keyboard, delete_post_keyboard, create_confirm_keyboards, \
     create_interval_keyboard_for_delete_post, create_type_time_keyboard_for_delete_posts, create_add_additional_url, \
-    create_buttons_url
+    create_buttons_url, create_schedule_day_keyboard
 from keyboards.reply.donor_post_keyboard import confirmation_donor_posts_menu
 from log.create_logger import logger
 from states.donor_posts import DonorPostsFSM, IntervalDeleteDonorPostFSM, CreateDonorButtonsFSM, \
@@ -82,6 +82,8 @@ async def get_interval(callback: CallbackQuery, state: FSMContext):
     type_time = callback.data[len('type_time_'):]
     async with state.proxy() as data:
         data['type_time'] = type_time
+        data['tag'] = await generate_random_tag_md5()
+
     if type_time == 'arbitrary':
         await callback.message.answer('Примеры: \n\n'
                                       '5м 30м (произвольный интервал от 5 минут до 30 минут)\n'
@@ -89,6 +91,17 @@ async def get_interval(callback: CallbackQuery, state: FSMContext):
                                       '1ч 2д (произвольный интервал от 1 часа до 2-ух дней)')
         await callback.message.answer('Введи интервал: ')
         await DonorPostsFSM.get_arbitrary.set()
+    elif type_time == 'schedule':
+        await callback.message.answer('Ты зашел в настройку собственного расписания для отправки постов\n\n'
+                                      '<b>Выбери день, в котором начнется отправка постов:</b> \n\n'
+                                      '*Примечание: если выбрать день, который является младше дня текущего месяца, '
+                                      'то будет выбран день следующего месяца относительно текущего'
+                                      ' (Допустим, что сегодня 15 января, но ты выбрал дату 10 января, а значит '
+                                      'рассылка начнется 10 февраля. Допустим (2), что сегодня 30 января, но ты выбрал '
+                                      'дату рассылки 29 числа, в феврале менее 29 дней, а значит начало рассылки '
+                                      'будет в марте 29 числа)', parse_mode='html',
+                                      reply_markup=await create_schedule_day_keyboard())
+        await DonorPostsFSM.get_schedule_day.set()
     else:
         text_type_time = '<b>Выбери интервал</b>, с которым будут публиковаться посты: \n\n'
         if type_time == 'Минуты':
@@ -101,6 +114,57 @@ async def get_interval(callback: CallbackQuery, state: FSMContext):
                                          reply_markup=await create_interval_keyboard(type_time),
                                          parse_mode='html')
         await DonorPostsFSM.get_interval.set()
+
+
+# @dp.callback_query_handler(Text(startswith='schedule_day_'), state=DonorPostsFSM.get_schedule_day)
+async def get_schedule_time(callback: CallbackQuery, state: FSMContext):
+    await callback.answer('День в расписании успешно установлен')
+    day = callback.data[len('schedule_day_'):]
+    async with state.proxy() as data:
+        data['schedule_day'] = day
+
+    await callback.message.answer(f'Отлично☕️ был выбран {day}-ый день\n\n'
+                                  f'<b>Введи времена, в которые будет происходить постинг:</b> \n\n'
+                                  f'Пример: <code>08:15 | 12:30 | 23:40</code>\n\n'
+                                  f'*Примечание: времён может быть сколько угодно, но их обязательно вводить через '
+                                  f'вертикальную черту "<code>|</code>"',
+                                  parse_mode='html')
+    await DonorPostsFSM.get_schedule_time.set()
+
+
+# @dp.message_handler(state=DonorPostsFSM.get_schedule_time)
+async def set_schedule(message: Message, state: FSMContext):
+    times = message.text.split('|')
+    if len(times) > 1:
+        message_schedule = await message.answer('Проверка')
+        for i, time in enumerate(times):  # Проверяем на то все ли правильно ввел пользователь
+            await message_schedule.edit_text('Проверка.')
+            # Не охватывает ограничения с 20-24 часы, т.е. возможно 25:23, 28:45 и так далее
+            match = re.findall(r'[0-2]\d:[0-5]\d', time)
+            await message_schedule.edit_text('Проверка..')
+            if not match:
+                await message_schedule.edit_text(f'Нарушение синтаксиса, невозможное существование времени: {time}\n\n'
+                                                 f'Повтори ввод времени или останови операцию',
+                                                 reply_markup=create_keyboard_stop_fsm())
+                return
+            times[i] = times[i].replace(' ', '')
+            await message_schedule.edit_text('Проверка...')
+        async with state.proxy() as data:
+            data['schedule_times'] = times
+        await message_schedule.edit_text('<b>Перешли из канала донора посты:</b> \n\n'
+                                         'Дождись загрузки всех медиа-файлов, после этого нажми на кнопку сохранить',
+                                         parse_mode='html', reply_markup=create_keyboard_stop_fsm())
+        await message.answer('<i>Будь крайне внимателен с коллекциями медиа! Если в посте содержится '
+                             'более чем 1 картинка или же видео, то это будет считаться за коллекцию. Каждый '
+                             'медиа-файл в коллекции бот считает как за отдельное сообщение. Соответственно '
+                             'пост из 5 медиа-файлов будет интерпретирован как 5 постов</i>',
+                             parse_mode='html', reply_markup=confirmation_donor_posts_menu)
+        await DonorPostsFSM.get_posts.set()
+
+    else:
+        await message.answer('Количество времён введенных через вертикальную черту "|" должно быть 2 и более\n\n'
+                             'Повтори ввод времени или останови операцию',
+                             reply_markup=create_keyboard_stop_fsm())
 
 
 # @dp.message_handler(state=DonorPostsFSM.get_arbitrary)
@@ -169,7 +233,6 @@ async def set_arbitrary_interval(message: Message, state: FSMContext):
                 data['first_interval'] = first_interval
                 data['second_type_time'] = second_type
                 data['second_interval'] = second_interval
-                data['tag'] = await generate_random_tag_md5()
 
             await message.answer('<b>Перешли из канала донора посты:</b> \n\n'
                                  'Дождись загрузки всех медиа-файлов, после этого нажми на кнопку сохранить',
@@ -197,7 +260,6 @@ async def get_posts(callback: CallbackQuery, state: FSMContext):
     await callback.answer('Интервал успешно выбран')
     async with state.proxy() as data:
         data['interval'] = callback.data[len('interval_'):]
-        data['tag'] = await generate_random_tag_md5()
 
     await callback.message.answer('<b>Перешли из канала донора посты:</b> \n\n'
                                   'Дождись загрузки всех медиа-файлов, после этого нажми на кнопку сохранить',
@@ -659,6 +721,10 @@ async def publication(callback: CallbackQuery, state: FSMContext):
             second_type_time = data.get('second_type_time')
             second_interval = data.get('second_interval')
 
+            # Если было задано расписание, то считываем все необходимые данные
+            schedule_day = data.get('schedule_day')
+            schedule_times = data.get('schedule_times')
+
         post_donor_db = DonorPostDB()
         posts = post_donor_db.get_posts_by_tag(tag=tag)
         if posts:
@@ -692,7 +758,8 @@ async def publication(callback: CallbackQuery, state: FSMContext):
                                                       second_interval=second_interval,
                                                       buttons=buttons,
                                                       description=description,
-                                                      mix_post=mix_post, delete_text=delete_text)
+                                                      mix_post=mix_post, delete_text=delete_text,
+                                                      schedule_times=schedule_times, schedule_day=schedule_day)
             if status_pub == 2:
                 await callback.message.answer('Внимание! Посты не были поставлены на публикацию, так как '
                                               'был нарушен синтаксис произвольного интервала!')
@@ -708,6 +775,9 @@ def register_handlers_donor_posts():
     dp.register_callback_query_handler(get_type_time, Text(startswith='channels_tagged_next_for_donor'),
                                        state=DonorPostsFSM.get_channels)
     dp.register_callback_query_handler(get_interval, Text(startswith='type_time_'), state=DonorPostsFSM.get_type_time)
+    dp.register_callback_query_handler(get_schedule_time, Text(startswith='schedule_day_'),
+                                       state=DonorPostsFSM.get_schedule_day)
+    dp.register_message_handler(set_schedule, state=DonorPostsFSM.get_schedule_time)
     dp.register_message_handler(set_arbitrary_interval, state=DonorPostsFSM.get_arbitrary)
     dp.register_callback_query_handler(get_posts, Text(startswith='interval_'), state=DonorPostsFSM.get_interval)
     dp.register_message_handler(confirm, Text(equals='Продолжить🚀'), state=DonorPostsFSM.get_posts)

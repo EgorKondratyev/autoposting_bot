@@ -65,9 +65,9 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                        delete_text: bool | None):
     post_donor_db = DonorPostDB()
     posts = post_donor_db.get_posts_by_tag(tag=tag)
-    if mix_post:
-        random.shuffle(posts)
     if posts:
+        if mix_post:
+            random.shuffle(posts)
         for attribute_post in posts:
             # attribute_post[1] - tag
 
@@ -186,6 +186,29 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
         msh.del_job(job_name=tag)
 
 
+async def create_cron_for_schedule(schedule_times: list, tag: str, channels: list, type_time_auto_delete: str,
+                                   interval_auto_delete: str,
+                                   buttons: InlineKeyboardMarkup | None, description: str | None, mix_post: bool | None,
+                                   delete_text: bool | None):
+    try:
+        for time in schedule_times:
+            # Несколько задач не могут иметь один и тот же тег, поэтому формируем для каждого тайминга свой тег
+            tag_schedule = await generate_random_tag_md5()
+            job = CronJob(name=tag_schedule).every().day.at(time).go(send_message, tag=tag, channels=channels,
+                                                                     type_time_auto_delete=type_time_auto_delete,
+                                                                     interval_auto_delete=interval_auto_delete,
+                                                                     buttons=buttons,
+                                                                     description=description, mix_post=mix_post,
+                                                                     delete_text=delete_text)
+            msh.add_job(job)
+    except Exception as ex:
+        logger.warning(f'Возникла ошибка при формировании расписания в функции "create_cron_for_schedule"\n'
+                       f'{ex}')
+        msh.del_job(tag)
+        post_donor_db = DonorPostDB()
+        post_donor_db.del_post_by_tag(tag=tag)
+
+
 async def publication_post_donor(tag: str,
                                  channels: list,
                                  type_time: str,
@@ -199,9 +222,13 @@ async def publication_post_donor(tag: str,
                                  buttons: InlineKeyboardMarkup | None,
                                  description: str | None,
                                  mix_post: bool | None,
-                                 delete_text: bool | None):
+                                 delete_text: bool | None,
+                                 schedule_day: str | None,
+                                 schedule_times: list | None):
     """
     Публикация постов из канала донора в каналы, которые указал пользователь.
+    :param schedule_day: День начала постинга по расписанию
+    :param schedule_times: Время постинга по расписанию
     :param delete_text:
     :param mix_post:
     :param description:
@@ -239,6 +266,15 @@ async def publication_post_donor(tag: str,
                                                             interval_auto_delete=interval_auto_delete, buttons=buttons,
                                                             description=description, mix_post=mix_post,
                                                             delete_text=delete_text)
+    elif type_time == 'schedule':
+        job = CronJob(name=tag, run_total=1).monthday(int(schedule_day)).go(create_cron_for_schedule, tag=tag,
+                                                                            channels=channels,
+                                                                            type_time_auto_delete=type_time_auto_delete,
+                                                                            interval_auto_delete=interval_auto_delete,
+                                                                            buttons=buttons,
+                                                                            description=description, mix_post=mix_post,
+                                                                            delete_text=delete_text,
+                                                                            schedule_times=schedule_times)
     else:  # Произвольный интервал, формирование
         if first_type_time == 'м' and second_type_time == 'м':  # 1
             interval = random.randint(int(first_interval), int(second_interval))

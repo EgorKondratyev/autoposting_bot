@@ -6,6 +6,8 @@ class DonorPostsFSM(StatesGroup):
     get_type_time = State()
     get_interval = State()
     get_arbitrary = State()
+    get_schedule_day = State()
+    get_schedule_time = State()
     get_posts = State()
     confirm = State()
 
