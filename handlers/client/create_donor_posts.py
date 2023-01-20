@@ -135,36 +135,30 @@ async def get_schedule_time(callback: CallbackQuery, state: FSMContext):
 # @dp.message_handler(state=DonorPostsFSM.get_schedule_time)
 async def set_schedule(message: Message, state: FSMContext):
     times = message.text.split('|')
-    if len(times) > 1:
-        message_schedule = await message.answer('Проверка')
-        for i, time in enumerate(times):  # Проверяем на то все ли правильно ввел пользователь
-            await message_schedule.edit_text('Проверка.')
-            # Не охватывает ограничения с 20-24 часы, т.е. возможно 25:23, 28:45 и так далее
-            match = re.findall(r'[0-2]\d:[0-5]\d', time)
-            await message_schedule.edit_text('Проверка..')
-            if not match:
-                await message_schedule.edit_text(f'Нарушение синтаксиса, невозможное существование времени: {time}\n\n'
-                                                 f'Повтори ввод времени или останови операцию',
-                                                 reply_markup=create_keyboard_stop_fsm())
-                return
-            times[i] = times[i].replace(' ', '')
-            await message_schedule.edit_text('Проверка...')
-        async with state.proxy() as data:
-            data['schedule_times'] = times
-        await message_schedule.edit_text('<b>Перешли из канала донора посты:</b> \n\n'
-                                         'Дождись загрузки всех медиа-файлов, после этого нажми на кнопку сохранить',
-                                         parse_mode='html', reply_markup=create_keyboard_stop_fsm())
-        await message.answer('<i>Будь крайне внимателен с коллекциями медиа! Если в посте содержится '
-                             'более чем 1 картинка или же видео, то это будет считаться за коллекцию. Каждый '
-                             'медиа-файл в коллекции бот считает как за отдельное сообщение. Соответственно '
-                             'пост из 5 медиа-файлов будет интерпретирован как 5 постов</i>',
-                             parse_mode='html', reply_markup=confirmation_donor_posts_menu)
-        await DonorPostsFSM.get_posts.set()
-
-    else:
-        await message.answer('Количество времён введенных через вертикальную черту "|" должно быть 2 и более\n\n'
-                             'Повтори ввод времени или останови операцию',
-                             reply_markup=create_keyboard_stop_fsm())
+    message_schedule = await message.answer('Проверка')
+    for i, time in enumerate(times):  # Проверяем на то все ли правильно ввел пользователь
+        await message_schedule.edit_text('Проверка.')
+        # Не охватывает ограничения с 20-24 часы, т.е. возможно 25:23, 28:45 и так далее
+        match = re.findall(r'[0-2]\d:[0-5]\d', time)
+        await message_schedule.edit_text('Проверка..')
+        if not match:
+            await message_schedule.edit_text(f'Нарушение синтаксиса, невозможное существование времени: {time}\n\n'
+                                             f'Повтори ввод времени или останови операцию',
+                                             reply_markup=create_keyboard_stop_fsm())
+            return
+        times[i] = times[i].replace(' ', '')
+        await message_schedule.edit_text('Проверка...')
+    async with state.proxy() as data:
+        data['schedule_times'] = times
+    await message_schedule.edit_text('<b>Перешли из канала донора посты:</b> \n\n'
+                                     'Дождись загрузки всех медиа-файлов, после этого нажми на кнопку сохранить',
+                                     parse_mode='html', reply_markup=create_keyboard_stop_fsm())
+    await message.answer('<i>Будь крайне внимателен с коллекциями медиа! Если в посте содержится '
+                         'более чем 1 картинка или же видео, то это будет считаться за коллекцию. Каждый '
+                         'медиа-файл в коллекции бот считает как за отдельное сообщение. Соответственно '
+                         'пост из 5 медиа-файлов будет интерпретирован как 5 постов</i>',
+                         parse_mode='html', reply_markup=confirmation_donor_posts_menu)
+    await DonorPostsFSM.get_posts.set()
 
 
 # @dp.message_handler(state=DonorPostsFSM.get_arbitrary)
@@ -375,7 +369,7 @@ async def set_posts(message: Message, state: FSMContext):
 
                 text_confirm_post = f'{text_user}'
                 await message.answer(text_confirm_post, parse_mode='html',
-                                     reply_markup=await delete_post_keyboard())
+                                     reply_markup=await delete_post_keyboard(), disable_web_page_preview=True)
         except Exception:
             logger.warning('...')
             traceback.print_exc()

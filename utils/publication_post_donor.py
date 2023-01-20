@@ -54,9 +54,9 @@ async def create_cron_delete_message(message, type_time_auto_delete, interval_au
     # at в async cron сломан, чтобы не юзать доп крон, воспользовался костылем (в кроне sleep):
     if type_time_auto_delete and interval_auto_delete:
         tag = await generate_random_tag_md5()
-        job = CronJob(tag, run_total=1).every(1).second.go(delete_messages, tag=tag, message=message,
-                                                           type_time_auto_delete=type_time_auto_delete,
-                                                           interval_auto_delete=interval_auto_delete)
+        job = CronJob(tag, run_total=1, tz='UTC+03:00').every(1).second.go(delete_messages, tag=tag, message=message,
+                                                                           type_time_auto_delete=type_time_auto_delete,
+                                                                           interval_auto_delete=interval_auto_delete)
         msh.add_job(job)
 
 
@@ -175,9 +175,10 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                     for channel in channels:
                         if buttons:
                             message = await bot.send_message(chat_id=channel, text=text, reply_markup=buttons,
-                                                             parse_mode='html')
+                                                             parse_mode='html', disable_web_page_preview=True)
                         else:
-                            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html')
+                            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html',
+                                                             disable_web_page_preview=True)
                         await create_cron_delete_message(message=message,
                                                          type_time_auto_delete=type_time_auto_delete,
                                                          interval_auto_delete=interval_auto_delete)
@@ -194,12 +195,14 @@ async def create_cron_for_schedule(schedule_times: list, tag: str, channels: lis
         for time in schedule_times:
             # Несколько задач не могут иметь один и тот же тег, поэтому формируем для каждого тайминга свой тег
             tag_schedule = await generate_random_tag_md5()
-            job = CronJob(name=tag_schedule).every().day.at(time).go(send_message, tag=tag, channels=channels,
-                                                                     type_time_auto_delete=type_time_auto_delete,
-                                                                     interval_auto_delete=interval_auto_delete,
-                                                                     buttons=buttons,
-                                                                     description=description, mix_post=mix_post,
-                                                                     delete_text=delete_text)
+            job = CronJob(name=tag_schedule, tz='UTC+03:00').every().day.at(time).go(send_message, tag=tag,
+                                                                                     channels=channels,
+                                                                                     type_time_auto_delete=type_time_auto_delete,
+                                                                                     interval_auto_delete=interval_auto_delete,
+                                                                                     buttons=buttons,
+                                                                                     description=description,
+                                                                                     mix_post=mix_post,
+                                                                                     delete_text=delete_text)
             msh.add_job(job)
     except Exception as ex:
         logger.warning(f'Возникла ошибка при формировании расписания в функции "create_cron_for_schedule"\n'
@@ -248,79 +251,96 @@ async def publication_post_donor(tag: str,
     if type_time == 'Минуты':
         if '🎅' in interval:
             interval = interval[:-1]
-        job = CronJob(name=tag).every(int(interval)).minute.go(send_message, tag=tag, channels=channels,
-                                                               type_time_auto_delete=type_time_auto_delete,
-                                                               interval_auto_delete=interval_auto_delete,
-                                                               buttons=buttons,
-                                                               description=description, mix_post=mix_post,
-                                                               delete_text=delete_text)
+        job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).minute.go(send_message, tag=tag, channels=channels,
+                                                                               type_time_auto_delete=type_time_auto_delete,
+                                                                               interval_auto_delete=interval_auto_delete,
+                                                                               buttons=buttons,
+                                                                               description=description,
+                                                                               mix_post=mix_post,
+                                                                               delete_text=delete_text)
     elif type_time == 'Часы':
-        job = CronJob(name=tag).every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
-                                                             type_time_auto_delete=type_time_auto_delete,
-                                                             interval_auto_delete=interval_auto_delete, buttons=buttons,
-                                                             description=description, mix_post=mix_post,
-                                                             delete_text=delete_text)
+        job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
+                                                                             type_time_auto_delete=type_time_auto_delete,
+                                                                             interval_auto_delete=interval_auto_delete,
+                                                                             buttons=buttons,
+                                                                             description=description, mix_post=mix_post,
+                                                                             delete_text=delete_text)
     elif type_time == 'Дни':
-        job = CronJob(name=tag).every(int(interval)).day.go(send_message, tag=tag, channels=channels,
-                                                            type_time_auto_delete=type_time_auto_delete,
-                                                            interval_auto_delete=interval_auto_delete, buttons=buttons,
-                                                            description=description, mix_post=mix_post,
-                                                            delete_text=delete_text)
-    elif type_time == 'schedule':
-        job = CronJob(name=tag, run_total=1).monthday(int(schedule_day)).go(create_cron_for_schedule, tag=tag,
-                                                                            channels=channels,
+        job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).day.go(send_message, tag=tag, channels=channels,
                                                                             type_time_auto_delete=type_time_auto_delete,
                                                                             interval_auto_delete=interval_auto_delete,
                                                                             buttons=buttons,
                                                                             description=description, mix_post=mix_post,
-                                                                            delete_text=delete_text,
-                                                                            schedule_times=schedule_times)
+                                                                            delete_text=delete_text)
+    elif type_time == 'schedule':
+        job = CronJob(name=tag, run_total=1, tz='UTC+03:00').monthday(int(schedule_day)).go(create_cron_for_schedule,
+                                                                                            tag=tag,
+                                                                                            channels=channels,
+                                                                                            type_time_auto_delete=type_time_auto_delete,
+                                                                                            interval_auto_delete=interval_auto_delete,
+                                                                                            buttons=buttons,
+                                                                                            description=description,
+                                                                                            mix_post=mix_post,
+                                                                                            delete_text=delete_text,
+                                                                                            schedule_times=schedule_times)
     else:  # Произвольный интервал, формирование
         if first_type_time == 'м' and second_type_time == 'м':  # 1
             interval = random.randint(int(first_interval), int(second_interval))
-            job = CronJob(name=tag).every(interval).minute.go(send_message, tag=tag, channels=channels,
-                                                              type_time_auto_delete=type_time_auto_delete,
-                                                              interval_auto_delete=interval_auto_delete,
-                                                              buttons=buttons, description=description,
-                                                              mix_post=mix_post, delete_text=delete_text)
+            job = CronJob(name=tag, tz='UTC+03:00').every(interval).minute.go(send_message, tag=tag, channels=channels,
+                                                                              type_time_auto_delete=type_time_auto_delete,
+                                                                              interval_auto_delete=interval_auto_delete,
+                                                                              buttons=buttons, description=description,
+                                                                              mix_post=mix_post,
+                                                                              delete_text=delete_text)
         elif first_type_time == 'ч' and second_type_time == 'ч':  # 2
             interval = random.randint(int(first_interval), int(second_interval))
-            job = CronJob(name=tag).every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
-                                                                 type_time_auto_delete=type_time_auto_delete,
-                                                                 interval_auto_delete=interval_auto_delete,
-                                                                 buttons=buttons, description=description,
-                                                                 mix_post=mix_post, delete_text=delete_text)
+            job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).hour.go(send_message, tag=tag,
+                                                                                 channels=channels,
+                                                                                 type_time_auto_delete=type_time_auto_delete,
+                                                                                 interval_auto_delete=interval_auto_delete,
+                                                                                 buttons=buttons,
+                                                                                 description=description,
+                                                                                 mix_post=mix_post,
+                                                                                 delete_text=delete_text)
         elif first_type_time == 'д' and second_type_time == 'д':  # 3
             interval = random.randint(int(first_interval), int(second_interval))
-            job = CronJob(name=tag).every(int(interval)).day.go(send_message, tag=tag, channels=channels,
-                                                                type_time_auto_delete=type_time_auto_delete,
-                                                                interval_auto_delete=interval_auto_delete,
-                                                                buttons=buttons, description=description,
-                                                                mix_post=mix_post, delete_text=delete_text)
+            job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).day.go(send_message, tag=tag,
+                                                                                channels=channels,
+                                                                                type_time_auto_delete=type_time_auto_delete,
+                                                                                interval_auto_delete=interval_auto_delete,
+                                                                                buttons=buttons,
+                                                                                description=description,
+                                                                                mix_post=mix_post,
+                                                                                delete_text=delete_text)
         elif first_type_time == 'м' and second_type_time == 'д':  # 4
             days_in_minutes = int(second_interval) * 1440
             interval = random.randint(int(first_interval), days_in_minutes)
-            job = CronJob(name=tag).every(interval).minute.go(send_message, tag=tag, channels=channels,
-                                                              type_time_auto_delete=type_time_auto_delete,
-                                                              interval_auto_delete=interval_auto_delete,
-                                                              buttons=buttons, description=description,
-                                                              mix_post=mix_post, delete_text=delete_text)
+            job = CronJob(name=tag, tz='UTC+03:00').every(interval).minute.go(send_message, tag=tag, channels=channels,
+                                                                              type_time_auto_delete=type_time_auto_delete,
+                                                                              interval_auto_delete=interval_auto_delete,
+                                                                              buttons=buttons, description=description,
+                                                                              mix_post=mix_post,
+                                                                              delete_text=delete_text)
         elif first_type_time == 'м' and second_type_time == 'ч':  # 5
             hours_in_minutes = int(second_interval) * 60
             interval = random.randint(int(first_interval), hours_in_minutes)
-            job = CronJob(name=tag).every(interval).minute.go(send_message, tag=tag, channels=channels,
-                                                              type_time_auto_delete=type_time_auto_delete,
-                                                              interval_auto_delete=interval_auto_delete,
-                                                              buttons=buttons, description=description,
-                                                              mix_post=mix_post, delete_text=delete_text)
+            job = CronJob(name=tag, tz='UTC+03:00').every(interval).minute.go(send_message, tag=tag, channels=channels,
+                                                                              type_time_auto_delete=type_time_auto_delete,
+                                                                              interval_auto_delete=interval_auto_delete,
+                                                                              buttons=buttons, description=description,
+                                                                              mix_post=mix_post,
+                                                                              delete_text=delete_text)
         elif first_type_time == 'ч' and second_type_time == 'д':  # 6
             days_in_hours = int(second_interval) * 24
             interval = random.randint(int(first_interval), days_in_hours)
-            job = CronJob(name=tag).every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
-                                                                 type_time_auto_delete=type_time_auto_delete,
-                                                                 interval_auto_delete=interval_auto_delete,
-                                                                 buttons=buttons, description=description,
-                                                                 mix_post=mix_post, delete_text=delete_text)
+            job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).hour.go(send_message, tag=tag,
+                                                                                 channels=channels,
+                                                                                 type_time_auto_delete=type_time_auto_delete,
+                                                                                 interval_auto_delete=interval_auto_delete,
+                                                                                 buttons=buttons,
+                                                                                 description=description,
+                                                                                 mix_post=mix_post,
+                                                                                 delete_text=delete_text)
         else:
             return 2
     msh.add_job(job)

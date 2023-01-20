@@ -12,7 +12,7 @@ from create_bot.bot import dp
 from databases.client import ChannelDB, PostDB, IndividualPostDB
 from handlers.stop_fsm import create_keyboard_stop_fsm
 from keyboards.inline.individual_post import create_keyboard_channels, create_keyboard_time_24_hours, \
-    create_keyboard_tagged_channels, create_keyboard_day, create_confirm_post, create_url_menu, create_button_for_post,\
+    create_keyboard_tagged_channels, create_keyboard_day, create_confirm_post, create_url_menu, create_button_for_post, \
     create_interval_auto_delete, create_type_interval_auto_delete
 from states.individual_post import IndividualPostFSM
 from log.create_logger import logger
@@ -270,7 +270,8 @@ async def confirm_create_post(message: Message, state: FSMContext):
                 data['text'] = text_user
 
             text_confirm_post = f'{text_user}'
-            await message.answer(text_confirm_post, parse_mode='html', reply_markup=await create_confirm_post())
+            await message.answer(text_confirm_post, parse_mode='html', reply_markup=await create_confirm_post(),
+                                 disable_web_page_preview=True)
 
         await IndividualPostFSM.confirm.set()
     except Exception:
@@ -376,7 +377,8 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
         if text_button:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                await callback.message.answer(text, reply_markup=button_link, parse_mode='html')
+                await callback.message.answer(text, reply_markup=button_link, parse_mode='html',
+                                              disable_web_page_preview=True)
             except BadRequest:
                 await callback.message.answer('Невалидная кнопка, прикрепленная к посту (вероятнее всего '
                                               'неверно указан url)\n\n'
@@ -384,7 +386,7 @@ async def preview_post(callback: CallbackQuery, state: FSMContext):
                 await state.finish()
                 await callback.message.answer('Процесс успешно остановлен')
         else:
-            await callback.message.answer(text, parse_mode='html')
+            await callback.message.answer(text, parse_mode='html', disable_web_page_preview=True)
 
 
 # @dp.callback_query_handler(Text(equals='confirm_individual_time'), state=IndividualPostFSM.confirm)
@@ -474,15 +476,15 @@ async def publication(callback: CallbackQuery, state: FSMContext):
     else:  # Отправка альбома
         posts = individual_post_db.get_post_by_tag(tag=tag)
         if int(day) == 99:  # Сегодня
-            job = CronJob(name=tag).day.at(time).go(send_album, tag=tag,
-                                                    channels=channels, posts=posts,
-                                                    type_time_auto_delete=type_time_auto_delete,
-                                                    interval_auto_delete=interval_auto_delete)
+            job = CronJob(name=tag, tz='UTC+03:00').day.at(time).go(send_album, tag=tag,
+                                                                    channels=channels, posts=posts,
+                                                                    type_time_auto_delete=type_time_auto_delete,
+                                                                    interval_auto_delete=interval_auto_delete)
         else:  # Остальные дни.
-            job = CronJob(name=tag).weekday(int(day)).at(time).go(send_album, tag=tag,
-                                                                  channels=channels, posts=posts,
-                                                                  type_time_auto_delete=type_time_auto_delete,
-                                                                  interval_auto_delete=interval_auto_delete)
+            job = CronJob(name=tag, tz='UTC+03:00').weekday(int(day)).at(time).go(send_album, tag=tag,
+                                                                                  channels=channels, posts=posts,
+                                                                                  type_time_auto_delete=type_time_auto_delete,
+                                                                                  interval_auto_delete=interval_auto_delete)
         msh.add_job(job)
         await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
                                       f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'

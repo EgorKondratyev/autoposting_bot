@@ -47,9 +47,9 @@ async def delete_message(tag: str, message, type_time_auto_delete: str, interval
 async def create_cron_delete_message(message, type_time_auto_delete, interval_auto_delete):
     if type_time_auto_delete and interval_auto_delete:
         tag = await generate_random_tag_md5()
-        job = CronJob(tag, run_total=1).every(1).second.go(delete_message, tag=tag, message=message,
-                                                           type_time_auto_delete=type_time_auto_delete,
-                                                           interval_auto_delete=interval_auto_delete)
+        job = CronJob(tag, run_total=1, tz='UTC+03:00').every(1).second.go(delete_message, tag=tag, message=message,
+                                                                           type_time_auto_delete=type_time_auto_delete,
+                                                                           interval_auto_delete=interval_auto_delete)
         msh.add_job(job)
 
 
@@ -72,7 +72,7 @@ async def send_text(tag, user_id: int, channels: list, text: str, text_button: s
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
                 message = await bot.send_message(chat_id=channel, text=text, reply_markup=button_link,
-                                                 parse_mode='html')
+                                                 parse_mode='html', disable_web_page_preview=True)
                 await create_cron_delete_message(message=message,
                                                  type_time_auto_delete=type_time_auto_delete,
                                                  interval_auto_delete=interval_auto_delete)
@@ -86,7 +86,8 @@ async def send_text(tag, user_id: int, channels: list, text: str, text_button: s
                 traceback.print_exc()
     else:
         for channel in channels:
-            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html')
+            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html',
+                                             disable_web_page_preview=True)
             await create_cron_delete_message(message=message,
                                              type_time_auto_delete=type_time_auto_delete,
                                              interval_auto_delete=interval_auto_delete)
@@ -208,7 +209,8 @@ async def send_video(tag, user_id: int, channels: list, text, text_button: str |
         for channel in channels:
             try:
                 button_link = await create_button_for_post(text_button=text_button, url_button=url_button)
-                message = await bot.send_video(chat_id=channel, caption=text, video=video_path, reply_markup=button_link,
+                message = await bot.send_video(chat_id=channel, caption=text, video=video_path,
+                                               reply_markup=button_link,
                                                parse_mode='html')
                 await create_cron_delete_message(message=message,
                                                  type_time_auto_delete=type_time_auto_delete,
@@ -297,67 +299,76 @@ async def publication_post(tag: str,
     try:
         if int(day) == 99:  # Сегодня
             if photo:
-                job = CronJob(name=tag).day.at(time).go(send_photo, tag=tag, user_id=user_id,
-                                                        channels=channels,
-                                                        text=text, text_button=text_button,
-                                                        url_button=url_button,
-                                                        photo_path=photo,
-                                                        interval_auto_delete=interval_auto_delete,
-                                                        type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').day.at(time).go(send_photo, tag=tag, user_id=user_id,
+                                                                        channels=channels,
+                                                                        text=text, text_button=text_button,
+                                                                        url_button=url_button,
+                                                                        photo_path=photo,
+                                                                        interval_auto_delete=interval_auto_delete,
+                                                                        type_time_auto_delete=type_time_auto_delete)
             elif video:
-                job = CronJob(name=tag).day.at(time).go(send_video, tag=tag, user_id=user_id,
-                                                        channels=channels,
-                                                        text=text, text_button=text_button,
-                                                        url_button=url_button,
-                                                        video_path=video,
-                                                        interval_auto_delete=interval_auto_delete,
-                                                        type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').day.at(time).go(send_video, tag=tag, user_id=user_id,
+                                                                        channels=channels,
+                                                                        text=text, text_button=text_button,
+                                                                        url_button=url_button,
+                                                                        video_path=video,
+                                                                        interval_auto_delete=interval_auto_delete,
+                                                                        type_time_auto_delete=type_time_auto_delete)
             elif animation:
-                job = CronJob(name=tag).day.at(time).go(send_animation, tag=tag, user_id=user_id,
-                                                        channels=channels,
-                                                        text=text, text_button=text_button,
-                                                        url_button=url_button,
-                                                        animation_path=animation,
-                                                        interval_auto_delete=interval_auto_delete,
-                                                        type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').day.at(time).go(send_animation, tag=tag, user_id=user_id,
+                                                                        channels=channels,
+                                                                        text=text, text_button=text_button,
+                                                                        url_button=url_button,
+                                                                        animation_path=animation,
+                                                                        interval_auto_delete=interval_auto_delete,
+                                                                        type_time_auto_delete=type_time_auto_delete)
             else:
-                job = CronJob(name=tag).day.at(time).go(send_text, tag=tag, user_id=user_id, channels=channels,
-                                                        text=text, text_button=text_button,
-                                                        url_button=url_button,
-                                                        interval_auto_delete=interval_auto_delete,
-                                                        type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').day.at(time).go(send_text, tag=tag, user_id=user_id,
+                                                                        channels=channels,
+                                                                        text=text, text_button=text_button,
+                                                                        url_button=url_button,
+                                                                        interval_auto_delete=interval_auto_delete,
+                                                                        type_time_auto_delete=type_time_auto_delete)
         else:  # Понедельник, вторник и остальные дни.
             if photo:
-                job = CronJob(name=tag).weekday(int(day)).at(time).go(send_photo, tag=tag, user_id=user_id,
-                                                                      channels=channels,
-                                                                      text=text, text_button=text_button,
-                                                                      url_button=url_button,
-                                                                      photo_path=photo,
-                                                                      interval_auto_delete=interval_auto_delete,
-                                                                      type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').weekday(int(day)).at(time).go(send_photo, tag=tag,
+                                                                                      user_id=user_id,
+                                                                                      channels=channels,
+                                                                                      text=text,
+                                                                                      text_button=text_button,
+                                                                                      url_button=url_button,
+                                                                                      photo_path=photo,
+                                                                                      interval_auto_delete=interval_auto_delete,
+                                                                                      type_time_auto_delete=type_time_auto_delete)
             elif video:
-                job = CronJob(name=tag).weekday(int(day)).at(time).go(send_video, tag=tag, user_id=user_id,
-                                                                      channels=channels,
-                                                                      text=text, text_button=text_button,
-                                                                      url_button=url_button,
-                                                                      video_path=video,
-                                                                      interval_auto_delete=interval_auto_delete,
-                                                                      type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').weekday(int(day)).at(time).go(send_video, tag=tag,
+                                                                                      user_id=user_id,
+                                                                                      channels=channels,
+                                                                                      text=text,
+                                                                                      text_button=text_button,
+                                                                                      url_button=url_button,
+                                                                                      video_path=video,
+                                                                                      interval_auto_delete=interval_auto_delete,
+                                                                                      type_time_auto_delete=type_time_auto_delete)
             elif animation:
-                job = CronJob(name=tag).weekday(int(day)).at(time).go(send_animation, tag=tag, user_id=user_id,
-                                                                      channels=channels,
-                                                                      text=text, text_button=text_button,
-                                                                      url_button=url_button,
-                                                                      animation_path=animation,
-                                                                      interval_auto_delete=interval_auto_delete,
-                                                                      type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').weekday(int(day)).at(time).go(send_animation, tag=tag,
+                                                                                      user_id=user_id,
+                                                                                      channels=channels,
+                                                                                      text=text,
+                                                                                      text_button=text_button,
+                                                                                      url_button=url_button,
+                                                                                      animation_path=animation,
+                                                                                      interval_auto_delete=interval_auto_delete,
+                                                                                      type_time_auto_delete=type_time_auto_delete)
             else:
-                job = CronJob(name=tag).weekday(int(day)).at(time).go(send_text, tag=tag, user_id=user_id,
-                                                                      channels=channels,
-                                                                      text=text, text_button=text_button,
-                                                                      url_button=url_button,
-                                                                      interval_auto_delete=interval_auto_delete,
-                                                                      type_time_auto_delete=type_time_auto_delete)
+                job = CronJob(name=tag, tz='UTC+03:00').weekday(int(day)).at(time).go(send_text, tag=tag,
+                                                                                      user_id=user_id,
+                                                                                      channels=channels,
+                                                                                      text=text,
+                                                                                      text_button=text_button,
+                                                                                      url_button=url_button,
+                                                                                      interval_auto_delete=interval_auto_delete,
+                                                                                      type_time_auto_delete=type_time_auto_delete)
         msh.add_job(job)
         return True
     except Exception:
