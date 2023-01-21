@@ -14,6 +14,7 @@ from handlers.stop_fsm import create_keyboard_stop_fsm
 from keyboards.inline.individual_post import create_keyboard_channels, create_keyboard_time_24_hours, \
     create_keyboard_tagged_channels, create_keyboard_day, create_confirm_post, create_url_menu, create_button_for_post, \
     create_interval_auto_delete, create_type_interval_auto_delete
+from keyboards.inline.start_command import create_start_menu
 from states.individual_post import IndividualPostFSM
 from log.create_logger import logger
 from utils.publication_post_individual import publication_post, send_album
@@ -39,6 +40,33 @@ async def start_create_post(callback: CallbackQuery):
                                       'зарегистрировал): \n\n'
                                       'Для остановки воспользуйся командой "/stop"',
                                       reply_markup=channels_menu, parse_mode='html')
+        await IndividualPostFSM.get_channel.set()
+    else:
+        await callback.message.answer('На данный момент у тебя не добавлено ни одного канала!')
+
+
+# @dp.callback_query_handler(Text(equals='channels_tagged_back'), state=IndividualPostFSM.get_time)
+async def set_channels_back(callback: CallbackQuery, state: FSMContext):
+    """
+    Возвращение из get_time handler в set_channel handler
+    :param callback:
+    :param state:
+    :return:
+    """
+    async with state.proxy() as data:
+        if data.get('channels_id'):
+            del data['channels_id']
+
+    await callback.answer()
+    channel_db = ChannelDB()
+    channels = channel_db.get_channels_by_user_id(user_id=callback.from_user.id)
+    if channels:
+        await callback.message.answer('Ты находишься в меню <i>"посты из донора"</i>\n\n'
+                                      '<b>Выбери канал(-ы) для публикации постов:</b> \n\n'
+                                      'Для остановки воспользуйся командой "/stop"',
+                                      reply_markup=await create_keyboard_channels(channels=channels,
+                                                                                  user_id=callback.from_user.id),
+                                      parse_mode='html')
         await IndividualPostFSM.get_channel.set()
     else:
         await callback.message.answer('На данный момент у тебя не добавлено ни одного канала!')
@@ -83,6 +111,17 @@ async def get_time(callback: CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         data['channel_id'] = channel_id
 
+    await callback.message.edit_text('Отлично!<b>Выбери время</b>, когда будет опубликован пост или же напиши '
+                                     'время вручную (Пример: 14:25, 17:03): \n\n'
+                                     'Для остановки воспользуйся командой "/stop"',
+                                     reply_markup=await create_keyboard_time_24_hours(),
+                                     parse_mode='html')
+    await IndividualPostFSM.get_time.set()
+
+
+# @dp.callback_query_handler(Text(equals='time_back'), state=IndividualPostFSM.get_day)
+async def get_time_back(callback: CallbackQuery):
+    await callback.answer()
     await callback.message.edit_text('Отлично!<b>Выбери время</b>, когда будет опубликован пост или же напиши '
                                      'время вручную (Пример: 14:25, 17:03): \n\n'
                                      'Для остановки воспользуйся командой "/stop"',
@@ -139,6 +178,18 @@ async def get_day_message(message: Message, state: FSMContext):
     else:
         await message.answer('Нарушен синтаксис ввода времени\n\n'
                              'Пример: 22:45', reply_markup=create_keyboard_stop_fsm())
+
+
+# @dp.callback_query_handler(Text(equals='day_back'), state=IndividualPostFSM.get_button)
+async def get_day_back(callback: CallbackQuery):
+    await callback.answer()
+    words = ['Замечательно🍵', 'Отлично☕️', 'Супер🍵']
+    await callback.message.answer(f'{random.choice(words)}!\n\n'
+                                  f'<b>Выбери день</b>, в который будет опубликован пост: \n\n'
+                                  f'Примечание*, если выбрать "Сегодня" и при этом время будет выходить за рамки этого '
+                                  f'дня, то пост будет опубликован завтра',
+                                  reply_markup=await create_keyboard_day(), parse_mode='html')
+    await IndividualPostFSM.get_day.set()
 
 
 # @dp.callback_query_handler(Text(startswith='day_'), state=IndividualPostFSM.get_day)
@@ -489,15 +540,24 @@ async def publication(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(f'Пост успешно поставлен на очередь публикации\n\n'
                                       f'Тег прикрепленный к посту: <b>{tag}</b>\n\n'
                                       f'Данный тег необходим для последующей отмены поста', parse_mode='html')
+        smiles = ['💎', '🦠', '☃️', '⭐️']
+        start_text = f'<b>Привет</b>{random.choice(smiles)}\n\n' \
+                     f'<i>Это бот помощник, позволяет публиковать посты с заданным интервалом!</i>\n\n'
+        await callback.message.answer(start_text,
+                                      reply_markup=create_start_menu, parse_mode='html')
 
 
 def register_handlers_create_individual_post():
     dp.register_callback_query_handler(start_create_post, Text(equals='start_create_post'))
+    dp.register_callback_query_handler(set_channels_back, Text(equals='channels_tagged_back'),
+                                       state=IndividualPostFSM.get_time)
     dp.register_callback_query_handler(get_time, Text(equals='channels_tagged_next'),
                                        state=IndividualPostFSM.get_channel)
     dp.register_callback_query_handler(set_channels, Text(startswith='channels_'), state=IndividualPostFSM.get_channel)
+    dp.register_callback_query_handler(get_time_back, Text(equals='time_back'), state=IndividualPostFSM.get_day)
     dp.register_callback_query_handler(get_day, Text(startswith='time_'), state=IndividualPostFSM.get_time)
     dp.register_message_handler(get_day_message, state=IndividualPostFSM.get_time)
+    dp.register_callback_query_handler(get_day_back, Text(equals='day_back'), state=IndividualPostFSM.get_button)
     dp.register_callback_query_handler(get_button_for_post, Text(startswith='day_'), state=IndividualPostFSM.get_day)
     dp.register_callback_query_handler(check_create_button, Text(startswith='create_url_'),
                                        state=IndividualPostFSM.get_button)

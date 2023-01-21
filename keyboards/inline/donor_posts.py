@@ -59,8 +59,9 @@ async def create_type_time_keyboard() -> InlineKeyboardMarkup:
         type_time_menu.insert(time_button)
     arbitrary_type_button = InlineKeyboardButton(text='Произвольный интервал', callback_data='type_time_arbitrary')
     schedule_interval_button = InlineKeyboardButton(text='Интервал с расписанием', callback_data='type_time_schedule')
+    back_button = InlineKeyboardButton(text='Назад', callback_data='channels_donor_back')
     stop_button = InlineKeyboardButton('🛑STOP🛑', callback_data='stop_fsm')
-    type_time_menu.add(arbitrary_type_button).add(schedule_interval_button).add(stop_button)
+    type_time_menu.add(arbitrary_type_button).add(schedule_interval_button).add(back_button).add(stop_button)
     return type_time_menu
 
 
@@ -86,6 +87,8 @@ async def create_interval_keyboard(type_time: str) -> InlineKeyboardMarkup:
         for day in days:
             day_button = InlineKeyboardButton(text=day + ' дня(-ень, -ней)', callback_data=f'interval_{day}')
             interval_menu.add(day_button)
+    back_button = InlineKeyboardButton(text='Назад', callback_data='channels_tagged_next_for_donor_back')
+    interval_menu.add(back_button)
     return interval_menu
 
 
@@ -96,7 +99,8 @@ async def create_schedule_day_keyboard() -> InlineKeyboardMarkup:
     for day in days:
         day_button = InlineKeyboardButton(text=day, callback_data=f'schedule_day_{day}')
         schedule_day_menu.insert(day_button)
-
+    back_button = InlineKeyboardButton(text='Назад', callback_data='channels_tagged_next_for_donor_back')
+    schedule_day_menu.add(back_button)
     return schedule_day_menu
 
 

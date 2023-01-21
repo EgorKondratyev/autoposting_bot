@@ -13,6 +13,7 @@ from keyboards.inline.donor_posts import create_type_time_keyboard, create_keybo
     create_keyboard_tagged_channels, create_interval_keyboard, delete_post_keyboard, create_confirm_keyboards, \
     create_interval_keyboard_for_delete_post, create_type_time_keyboard_for_delete_posts, \
     create_buttons_url, create_schedule_day_keyboard
+from keyboards.inline.start_command import create_start_menu
 from keyboards.reply.donor_post_keyboard import confirmation_donor_posts_menu
 from log.create_logger import logger
 from states.donor_posts import DonorPostsFSM, IntervalDeleteDonorPostFSM, CreateDonorButtonsFSM, \
@@ -24,6 +25,32 @@ from utils.utils import date_last_post
 
 # @dp.callback_query_handler(Text(equals='start_post_in_turn'), state=None)
 async def get_channels(callback: CallbackQuery):
+    await callback.answer()
+    channel_db = ChannelDB()
+    channels = channel_db.get_channels_by_user_id(user_id=callback.from_user.id)
+    if channels:
+        await callback.message.answer('Ты находишься в меню <i>"посты из донора"</i>\n\n'
+                                      '<b>Выбери канал(-ы) для публикации постов:</b> \n\n'
+                                      'Для остановки воспользуйся командой "/stop"',
+                                      reply_markup=await create_keyboard_channels(channels=channels),
+                                      parse_mode='html')
+        await DonorPostsFSM.get_channels.set()
+    else:
+        await callback.message.answer('На данный момент у тебя не добавлено ни одного канала!')
+
+
+# @dp.callback_query_handler(Text(equals='channels_donor_back'), state=DonorPostsFSM.get_type_time)
+async def set_channels_back(callback: CallbackQuery, state: FSMContext):
+    """
+    Вызывается если пользователь нажал кнопку "назад" в процессе get_type_time (handler).
+    :param callback:
+    :param state:
+    :return:
+    """
+    async with state.proxy() as data:
+        if data.get('channels_id'):
+            del data['channels_id']
+
     await callback.answer()
     channel_db = ChannelDB()
     channels = channel_db.get_channels_by_user_id(user_id=callback.from_user.id)
@@ -70,6 +97,20 @@ async def set_channels(callback: CallbackQuery, state: FSMContext):
 
 # @dp.callback_query_handler(Text(startswith='channels_tagged_next_for_donor'), state=DonorPostsFSM.get_channels)
 async def get_type_time(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.answer('<b>Выбери тип интервала:</b> \n\n',
+                                  reply_markup=await create_type_time_keyboard(),
+                                  parse_mode='html')
+    await DonorPostsFSM.get_type_time.set()
+
+
+# @dp.callback_query_handler(Text(equals='channels_tagged_next_for_donor_back'),
+#                            state=[
+#                                DonorPostsFSM.get_arbitrary,
+#                                DonorPostsFSM.get_schedule_day,
+#                                DonorPostsFSM.get_interval
+#                            ])
+async def get_type_time_back(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await callback.message.answer('<b>Выбери тип интервала:</b> \n\n',
                                   reply_markup=await create_type_time_keyboard(),
@@ -798,6 +839,11 @@ async def publication(callback: CallbackQuery, state: FSMContext):
                                                       schedule_times=schedule_times, schedule_day=schedule_day,
                                                       preview_link=preview_link,
                                                       user_id=callback.from_user.id)
+            smiles = ['💎', '🦠', '☃️', '⭐️']
+            start_text = f'<b>Привет</b>{random.choice(smiles)}\n\n' \
+                         f'<i>Это бот помощник, позволяет публиковать посты с заданным интервалом!</i>\n\n'
+            await callback.message.answer(start_text,
+                                          reply_markup=create_start_menu, parse_mode='html')
             if status_pub == 2:
                 await callback.message.answer('Внимание! Посты не были поставлены на публикацию, так как '
                                               'был нарушен синтаксис произвольного интервала!')
@@ -808,10 +854,18 @@ async def publication(callback: CallbackQuery, state: FSMContext):
 
 def register_handlers_donor_posts():
     dp.register_callback_query_handler(get_channels, Text(equals='start_post_in_turn'), state=None)
+    dp.register_callback_query_handler(set_channels_back, Text(equals='channels_donor_back'),
+                                       state=DonorPostsFSM.get_type_time)
     dp.register_callback_query_handler(set_channels, Text(startswith='channels_donor_'),
                                        state=DonorPostsFSM.get_channels)
     dp.register_callback_query_handler(get_type_time, Text(startswith='channels_tagged_next_for_donor'),
                                        state=DonorPostsFSM.get_channels)
+    dp.register_callback_query_handler(get_type_time_back, Text(equals='channels_tagged_next_for_donor_back'),
+                                       state=[
+                                           DonorPostsFSM.get_arbitrary,
+                                           DonorPostsFSM.get_schedule_day,
+                                           DonorPostsFSM.get_interval
+                                       ])
     dp.register_callback_query_handler(get_interval, Text(startswith='type_time_'), state=DonorPostsFSM.get_type_time)
     dp.register_callback_query_handler(get_schedule_time, Text(startswith='schedule_day_'),
                                        state=DonorPostsFSM.get_schedule_day)

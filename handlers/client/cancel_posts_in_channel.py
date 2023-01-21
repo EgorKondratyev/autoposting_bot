@@ -20,7 +20,7 @@ async def get_id_channel(callback: CallbackQuery):
         channel_name = attribute[1]
         text += f'{i}. ID: <code>{channel_id}</code> | Название: <b>{channel_name}</b>\n'
 
-    await callback.message.answer(text, parse_mode='html')
+    await callback.message.answer(text, parse_mode='html', reply_markup=create_keyboard_stop_fsm())
     await CancelPostChannelFSM.get_id_channel.set()
 
 

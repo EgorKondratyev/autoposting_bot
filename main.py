@@ -2,6 +2,7 @@ import asyncio
 
 from aiogram import executor
 from create_bot.bot import dp
+from create_bot.commands import set_command
 from databases.client import PostDB, DonorPostDB, CheckDonorPostDB
 from log.create_logger import logger
 from utils.create_cron import msh
@@ -9,6 +10,7 @@ from utils.create_cron import msh
 
 async def start(_):
     asyncio.create_task(msh.start())
+    await set_command()
     logger.debug('Бот успешно запущен!')
 
 

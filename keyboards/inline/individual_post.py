@@ -6,7 +6,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 create_url_menu = InlineKeyboardMarkup(row_width=2)
 yes_button = InlineKeyboardButton(text='Да', callback_data='create_url_yes')
 no_button = InlineKeyboardButton(text='Нет', callback_data='create_url_no')
-create_url_menu.insert(yes_button).insert(no_button)
+back_button_url = InlineKeyboardButton(text='Назад', callback_data='day_back')
+create_url_menu.insert(yes_button).insert(no_button).add(back_button_url)
 
 
 async def create_keyboard_channels(channels: list | tuple, user_id: int) -> InlineKeyboardMarkup:
@@ -76,6 +77,8 @@ async def create_keyboard_time_24_hours() -> InlineKeyboardMarkup:
         else:
             hour_button = InlineKeyboardButton(text=hour + snow, callback_data=f'time_{hour}')
         time_menu.insert(hour_button)
+    back_button = InlineKeyboardButton(text='Назад', callback_data='channels_tagged_back')
+    time_menu.add(back_button)
     return time_menu
 
 
@@ -90,6 +93,8 @@ async def create_keyboard_day() -> InlineKeyboardMarkup:
     for index_day, day in days.items():
         day_button = InlineKeyboardButton(text=f'{day}', callback_data=f'day_{index_day}')
         day_menu.insert(day_button)
+    back_button = InlineKeyboardButton(text='🔙Назад', callback_data='time_back')
+    day_menu.add(back_button)
     return day_menu
 
 
