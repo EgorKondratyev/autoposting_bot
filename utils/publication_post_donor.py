@@ -6,7 +6,7 @@ from aiogram.types import MediaGroup, InlineKeyboardMarkup
 from async_cron.job import CronJob
 
 from create_bot.bot import bot
-from databases.client import DonorPostDB
+from databases.client import DonorPostDB, CheckDonorPostDB
 from utils.create_cron import msh
 from utils.generate_random_tag import generate_random_tag_md5
 from log.create_logger import logger
@@ -60,10 +60,11 @@ async def create_cron_delete_message(message, type_time_auto_delete, interval_au
         msh.add_job(job)
 
 
-async def send_message(tag: str, channels: list, type_time_auto_delete: str, interval_auto_delete: str,
+async def send_message(tag: str, channels: list, user_id: int, type_time_auto_delete: str, interval_auto_delete: str,
                        buttons: InlineKeyboardMarkup | None, description: str | None, mix_post: bool | None,
-                       delete_text: bool | None):
+                       delete_text: bool | None, preview_link: bool | None):
     post_donor_db = DonorPostDB()
+    check_donor_post_db = CheckDonorPostDB()
     posts = post_donor_db.get_posts_by_tag(tag=tag)
     if posts:
         if mix_post:
@@ -112,11 +113,14 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
                             media_group.attach_video(video=video_id)
                 try:
                     for channel in channels:
-                        message = await bot.send_media_group(chat_id=channel, media=media_group)
-                        logger.debug('Успешная отправка альбмного донора-поста')
-                        await create_cron_delete_message(message=message,
-                                                         type_time_auto_delete=type_time_auto_delete,
-                                                         interval_auto_delete=interval_auto_delete)
+                        if not check_donor_post_db.exists_pk(channel_id=channel, pk=pk, user_id=user_id):
+                            message = await bot.send_media_group(chat_id=channel, media=media_group)
+                            logger.debug('Успешная отправка альбмного донора-поста')
+                            await create_cron_delete_message(message=message,
+                                                             type_time_auto_delete=type_time_auto_delete,
+                                                             interval_auto_delete=interval_auto_delete)
+                        else:
+                            check_donor_post_db.del_pk(channel_id=channel, pk=pk, user_id=user_id)
                 except Exception as ex:
                     traceback.print_exc()
                     logger.warning(f'Возникла ошибка при отправке сообщения-альбома в доноре постов\n\n'
@@ -128,69 +132,92 @@ async def send_message(tag: str, channels: list, type_time_auto_delete: str, int
 
                 if photo_id:
                     for channel in channels:
-                        if buttons:
-                            message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text,
-                                                           reply_markup=buttons, parse_mode='html')
-                        else:
-                            message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text,
-                                                           parse_mode='html')
+                        # Проверяем отменял ли пользователь публикацию поста в данный канал или нет
+                        if not check_donor_post_db.exists_pk(channel_id=channel, pk=pk, user_id=user_id):
+                            if buttons:
+                                message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text,
+                                                               reply_markup=buttons, parse_mode='html')
+                            else:
+                                message = await bot.send_photo(chat_id=channel, photo=photo_id, caption=text,
+                                                               parse_mode='html')
 
-                        await create_cron_delete_message(message=message,
-                                                         type_time_auto_delete=type_time_auto_delete,
-                                                         interval_auto_delete=interval_auto_delete)
+                            await create_cron_delete_message(message=message,
+                                                             type_time_auto_delete=type_time_auto_delete,
+                                                             interval_auto_delete=interval_auto_delete)
+                        else:
+                            check_donor_post_db.del_pk(channel_id=channel, pk=pk, user_id=user_id)
                 elif video_id:
                     for channel in channels:
-                        if buttons:
-                            message = await bot.send_video(chat_id=channel, video=video_id, caption=text,
-                                                           reply_markup=buttons, parse_mode='html')
-                        else:
-                            message = await bot.send_video(chat_id=channel, video=video_id, caption=text,
-                                                           parse_mode='html')
+                        if not check_donor_post_db.exists_pk(channel_id=channel, pk=pk, user_id=user_id):
+                            if buttons:
+                                message = await bot.send_video(chat_id=channel, video=video_id, caption=text,
+                                                               reply_markup=buttons, parse_mode='html')
+                            else:
+                                message = await bot.send_video(chat_id=channel, video=video_id, caption=text,
+                                                               parse_mode='html')
 
-                        await create_cron_delete_message(message=message,
-                                                         type_time_auto_delete=type_time_auto_delete,
-                                                         interval_auto_delete=interval_auto_delete)
+                            await create_cron_delete_message(message=message,
+                                                             type_time_auto_delete=type_time_auto_delete,
+                                                             interval_auto_delete=interval_auto_delete)
+                        else:
+                            check_donor_post_db.del_pk(channel_id=channel, pk=pk, user_id=user_id)
                 elif animation_id:
                     for channel in channels:
-                        if buttons:
-                            message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text,
-                                                               reply_markup=buttons, parse_mode='html')
+                        if not check_donor_post_db.exists_pk(channel_id=channel, pk=pk, user_id=user_id):
+                            if buttons:
+                                message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text,
+                                                                   reply_markup=buttons, parse_mode='html')
+                            else:
+                                message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text,
+                                                                   parse_mode='html')
+                            await create_cron_delete_message(message=message,
+                                                             type_time_auto_delete=type_time_auto_delete,
+                                                             interval_auto_delete=interval_auto_delete)
                         else:
-                            message = await bot.send_animation(chat_id=channel, animation=animation_id, caption=text,
-                                                               parse_mode='html')
-                        await create_cron_delete_message(message=message,
-                                                         type_time_auto_delete=type_time_auto_delete,
-                                                         interval_auto_delete=interval_auto_delete)
+                            check_donor_post_db.del_pk(channel_id=channel, pk=pk, user_id=user_id)
                 elif video_note:
                     for channel in channels:
-                        if buttons:
-                            message = await bot.send_video_note(chat_id=channel, video_note=video_note,
-                                                                reply_markup=buttons)
+                        if not check_donor_post_db.exists_pk(channel_id=channel, pk=pk, user_id=user_id):
+                            if buttons:
+                                message = await bot.send_video_note(chat_id=channel, video_note=video_note,
+                                                                    reply_markup=buttons)
+                            else:
+                                message = await bot.send_video_note(chat_id=channel, video_note=video_note)
+                            await create_cron_delete_message(message=message,
+                                                             type_time_auto_delete=type_time_auto_delete,
+                                                             interval_auto_delete=interval_auto_delete)
                         else:
-                            message = await bot.send_video_note(chat_id=channel, video_note=video_note)
-                        await create_cron_delete_message(message=message,
-                                                         type_time_auto_delete=type_time_auto_delete,
-                                                         interval_auto_delete=interval_auto_delete)
+                            check_donor_post_db.del_pk(channel_id=channel, pk=pk, user_id=user_id)
                 else:  # text
                     for channel in channels:
-                        if buttons:
-                            message = await bot.send_message(chat_id=channel, text=text, reply_markup=buttons,
-                                                             parse_mode='html', disable_web_page_preview=True)
+                        if not check_donor_post_db.exists_pk(channel_id=channel, pk=pk, user_id=user_id):
+                            if buttons:
+                                if preview_link:
+                                    message = await bot.send_message(chat_id=channel, text=text, reply_markup=buttons,
+                                                                     parse_mode='html')
+                                else:
+                                    message = await bot.send_message(chat_id=channel, text=text, reply_markup=buttons,
+                                                                     parse_mode='html', disable_web_page_preview=True)
+                            else:
+                                if preview_link:
+                                    message = await bot.send_message(chat_id=channel, text=text, parse_mode='html')
+                                else:
+                                    message = await bot.send_message(chat_id=channel, text=text, parse_mode='html',
+                                                                     disable_web_page_preview=True)
+                            await create_cron_delete_message(message=message,
+                                                             type_time_auto_delete=type_time_auto_delete,
+                                                             interval_auto_delete=interval_auto_delete)
                         else:
-                            message = await bot.send_message(chat_id=channel, text=text, parse_mode='html',
-                                                             disable_web_page_preview=True)
-                        await create_cron_delete_message(message=message,
-                                                         type_time_auto_delete=type_time_auto_delete,
-                                                         interval_auto_delete=interval_auto_delete)
+                            check_donor_post_db.del_pk(channel_id=channel, pk=pk, user_id=user_id)
             break
     else:
         msh.del_job(job_name=tag)
 
 
 async def create_cron_for_schedule(schedule_times: list, tag: str, channels: list, type_time_auto_delete: str,
-                                   interval_auto_delete: str,
+                                   interval_auto_delete: str, user_id: int,
                                    buttons: InlineKeyboardMarkup | None, description: str | None, mix_post: bool | None,
-                                   delete_text: bool | None):
+                                   delete_text: bool | None, preview_link: bool | None):
     try:
         for time in schedule_times:
             # Несколько задач не могут иметь один и тот же тег, поэтому формируем для каждого тайминга свой тег
@@ -202,7 +229,9 @@ async def create_cron_for_schedule(schedule_times: list, tag: str, channels: lis
                                                                                      buttons=buttons,
                                                                                      description=description,
                                                                                      mix_post=mix_post,
-                                                                                     delete_text=delete_text)
+                                                                                     delete_text=delete_text,
+                                                                                     user_id=user_id,
+                                                                                     preview_link=preview_link)
             msh.add_job(job)
     except Exception as ex:
         logger.warning(f'Возникла ошибка при формировании расписания в функции "create_cron_for_schedule"\n'
@@ -214,6 +243,7 @@ async def create_cron_for_schedule(schedule_times: list, tag: str, channels: lis
 
 async def publication_post_donor(tag: str,
                                  channels: list,
+                                 user_id: int,
                                  type_time: str,
                                  interval: str,
                                  type_time_auto_delete: str,
@@ -227,9 +257,13 @@ async def publication_post_donor(tag: str,
                                  mix_post: bool | None,
                                  delete_text: bool | None,
                                  schedule_day: str | None,
-                                 schedule_times: list | None):
+                                 schedule_times: list | None,
+                                 preview_link: bool | None):
     """
     Публикация постов из канала донора в каналы, которые указал пользователь.
+    :param user_id:
+    :param preview_link: Отвечает за отображение картинки в самом посте, если у поста имеется ссылка
+     (disable_web_page_preview=True)
     :param schedule_day: День начала постинга по расписанию
     :param schedule_times: Время постинга по расписанию
     :param delete_text:
@@ -249,7 +283,7 @@ async def publication_post_donor(tag: str,
     :return:
     """
     if type_time == 'Минуты':
-        if '🎅' in interval:
+        if '🧃' in interval or '🍑' in interval:
             interval = interval[:-1]
         job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).minute.go(send_message, tag=tag, channels=channels,
                                                                                type_time_auto_delete=type_time_auto_delete,
@@ -257,21 +291,27 @@ async def publication_post_donor(tag: str,
                                                                                buttons=buttons,
                                                                                description=description,
                                                                                mix_post=mix_post,
-                                                                               delete_text=delete_text)
+                                                                               delete_text=delete_text,
+                                                                               preview_link=preview_link,
+                                                                               user_id=user_id)
     elif type_time == 'Часы':
         job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).hour.go(send_message, tag=tag, channels=channels,
                                                                              type_time_auto_delete=type_time_auto_delete,
                                                                              interval_auto_delete=interval_auto_delete,
                                                                              buttons=buttons,
                                                                              description=description, mix_post=mix_post,
-                                                                             delete_text=delete_text)
+                                                                             delete_text=delete_text,
+                                                                             preview_link=preview_link,
+                                                                             user_id=user_id)
     elif type_time == 'Дни':
         job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).day.go(send_message, tag=tag, channels=channels,
                                                                             type_time_auto_delete=type_time_auto_delete,
                                                                             interval_auto_delete=interval_auto_delete,
                                                                             buttons=buttons,
                                                                             description=description, mix_post=mix_post,
-                                                                            delete_text=delete_text)
+                                                                            delete_text=delete_text,
+                                                                            preview_link=preview_link,
+                                                                            user_id=user_id)
     elif type_time == 'schedule':
         job = CronJob(name=tag, run_total=1, tz='UTC+03:00').monthday(int(schedule_day)).go(create_cron_for_schedule,
                                                                                             tag=tag,
@@ -282,7 +322,9 @@ async def publication_post_donor(tag: str,
                                                                                             description=description,
                                                                                             mix_post=mix_post,
                                                                                             delete_text=delete_text,
-                                                                                            schedule_times=schedule_times)
+                                                                                            schedule_times=schedule_times,
+                                                                                            preview_link=preview_link,
+                                                                                            user_id=user_id)
     else:  # Произвольный интервал, формирование
         if first_type_time == 'м' and second_type_time == 'м':  # 1
             interval = random.randint(int(first_interval), int(second_interval))
@@ -291,7 +333,9 @@ async def publication_post_donor(tag: str,
                                                                               interval_auto_delete=interval_auto_delete,
                                                                               buttons=buttons, description=description,
                                                                               mix_post=mix_post,
-                                                                              delete_text=delete_text)
+                                                                              delete_text=delete_text,
+                                                                              preview_link=preview_link,
+                                                                              user_id=user_id)
         elif first_type_time == 'ч' and second_type_time == 'ч':  # 2
             interval = random.randint(int(first_interval), int(second_interval))
             job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).hour.go(send_message, tag=tag,
@@ -301,7 +345,9 @@ async def publication_post_donor(tag: str,
                                                                                  buttons=buttons,
                                                                                  description=description,
                                                                                  mix_post=mix_post,
-                                                                                 delete_text=delete_text)
+                                                                                 delete_text=delete_text,
+                                                                                 preview_link=preview_link,
+                                                                                 user_id=user_id)
         elif first_type_time == 'д' and second_type_time == 'д':  # 3
             interval = random.randint(int(first_interval), int(second_interval))
             job = CronJob(name=tag, tz='UTC+03:00').every(int(interval)).day.go(send_message, tag=tag,
@@ -311,7 +357,9 @@ async def publication_post_donor(tag: str,
                                                                                 buttons=buttons,
                                                                                 description=description,
                                                                                 mix_post=mix_post,
-                                                                                delete_text=delete_text)
+                                                                                delete_text=delete_text,
+                                                                                preview_link=preview_link,
+                                                                                user_id=user_id)
         elif first_type_time == 'м' and second_type_time == 'д':  # 4
             days_in_minutes = int(second_interval) * 1440
             interval = random.randint(int(first_interval), days_in_minutes)
@@ -320,7 +368,9 @@ async def publication_post_donor(tag: str,
                                                                               interval_auto_delete=interval_auto_delete,
                                                                               buttons=buttons, description=description,
                                                                               mix_post=mix_post,
-                                                                              delete_text=delete_text)
+                                                                              delete_text=delete_text,
+                                                                              preview_link=preview_link,
+                                                                              user_id=user_id)
         elif first_type_time == 'м' and second_type_time == 'ч':  # 5
             hours_in_minutes = int(second_interval) * 60
             interval = random.randint(int(first_interval), hours_in_minutes)
@@ -329,7 +379,9 @@ async def publication_post_donor(tag: str,
                                                                               interval_auto_delete=interval_auto_delete,
                                                                               buttons=buttons, description=description,
                                                                               mix_post=mix_post,
-                                                                              delete_text=delete_text)
+                                                                              delete_text=delete_text,
+                                                                              preview_link=preview_link,
+                                                                              user_id=user_id)
         elif first_type_time == 'ч' and second_type_time == 'д':  # 6
             days_in_hours = int(second_interval) * 24
             interval = random.randint(int(first_interval), days_in_hours)
@@ -340,7 +392,9 @@ async def publication_post_donor(tag: str,
                                                                                  buttons=buttons,
                                                                                  description=description,
                                                                                  mix_post=mix_post,
-                                                                                 delete_text=delete_text)
+                                                                                 delete_text=delete_text,
+                                                                                 preview_link=preview_link,
+                                                                                 user_id=user_id)
         else:
             return 2
     msh.add_job(job)

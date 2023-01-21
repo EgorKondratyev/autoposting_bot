@@ -6,6 +6,7 @@ from handlers.client.create_individual_post import register_handlers_create_indi
 from handlers.client.create_donor_posts import register_handlers_donor_posts
 from handlers.client.cancel_posts import register_handlers_cancel_posts
 from handlers.client.cancel_donor_posts import register_handlers_cancel_posts_donor
+from handlers.client.cancel_posts_in_channel import register_cancel_posts_channel
 
 register_stop_fsm_handler()
 register_start_command_handlers()
@@ -15,3 +16,4 @@ register_handlers_create_individual_post()
 register_handlers_cancel_posts()
 register_handlers_cancel_posts_donor()
 register_handlers_donor_posts()
+register_cancel_posts_channel()

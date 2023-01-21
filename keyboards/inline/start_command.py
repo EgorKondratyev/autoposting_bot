@@ -8,5 +8,7 @@ create_post_button = InlineKeyboardButton(text='Создать пост', callba
 post_in_turn = InlineKeyboardButton(text='Посты из донора', callback_data='start_post_in_turn')
 cancel_posts = InlineKeyboardButton(text='Отмена постов', callback_data='start_cancel_posts')
 cancel_donor_posts = InlineKeyboardButton(text='Отмена постов-доноров', callback_data='start_cancel_donor_posts')
+cancel_donor_posts_in_channel = InlineKeyboardButton(text='Отмена постов-доноров канала',
+                                                     callback_data='start_cancel_donor_posts_channel')
 create_start_menu.insert(add_channel_button).insert(delete_channel_button).insert(create_post_button).\
-    insert(post_in_turn).insert(cancel_posts).insert(cancel_donor_posts)
+    insert(post_in_turn).insert(cancel_posts).insert(cancel_donor_posts).insert(cancel_donor_posts_in_channel)

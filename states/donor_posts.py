@@ -19,8 +19,6 @@ class IntervalDeleteDonorPostFSM(StatesGroup):
 
 class CreateDonorButtonsFSM(StatesGroup):
     get_name = State()
-    get_url = State()
-    confirm = State()
 
 
 class CreateDescriptionDonorFSM(StatesGroup):

@@ -45,7 +45,7 @@ async def create_keyboard_tagged_channels(channels: list | tuple, user_id: int, 
             channels_menu.insert(channel_button)
         else:
             i += 1
-            channel_button = InlineKeyboardButton(text=f'{channel_name}☃️',
+            channel_button = InlineKeyboardButton(text=f'{channel_name}🎈',
                                                   callback_data=f'channels_{channel_id}_{user_id}')
             channels_menu.insert(channel_button)
     if i != 0:
@@ -68,7 +68,7 @@ async def create_keyboard_time_24_hours() -> InlineKeyboardMarkup:
         '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
         '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
     ]
-    snow = '❄️'
+    snow = '🍓'
     random_snow = random.randint(0, len(hours))
     for i, hour in enumerate(hours):
         if random_snow != i:
@@ -135,7 +135,7 @@ async def create_type_interval_auto_delete():
 
 async def create_interval_auto_delete(type_time: str):
     interval_menu = InlineKeyboardMarkup(row_width=4)
-    snow = '🎅'
+    snow = '🍑'
     if type_time == 'Минуты':
         minutes = ('5', '10', '15', '20', '25', '30', '35', '40', '45', '55')
         number_snow = random.randint(0, len(minutes) - 1)

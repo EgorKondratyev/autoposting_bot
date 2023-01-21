@@ -5,6 +5,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 
 from create_bot.bot import dp
+from keyboards.inline.start_command import create_start_menu
 
 
 def create_keyboard_stop_fsm() -> InlineKeyboardMarkup:
@@ -29,13 +30,20 @@ async def stop_fsm(message: [Message, CallbackQuery], state: FSMContext):
 
     await state.finish()
     smiles = ['🍵', '🧃', '☕', '✨']
+    start_text = f'<b>Привет</b>{random.choice(smiles)}\n\n' \
+                 f'<i>Это бот помощник, позволяет публиковать посты с заданным интервалом!</i>\n\n'
     try:  # callback
         await message.answer()
         if random.randint(1, 20) == 19:
             await message.message.answer('✨')
         await message.message.answer(f'Операция успешно остановлена {random.choice(smiles)}')
+        await message.message.answer(start_text,
+                                     reply_markup=create_start_menu, parse_mode='html')
     except Exception:  # message
-        await message.answer(f'Операция успешно остановлена {random.choice(smiles)}', reply_markup=ReplyKeyboardRemove())
+        await message.answer(f'Операция успешно остановлена {random.choice(smiles)}',
+                             reply_markup=ReplyKeyboardRemove())
+        await message.answer(start_text,
+                             reply_markup=create_start_menu, parse_mode='html')
 
 
 def register_stop_fsm_handler():

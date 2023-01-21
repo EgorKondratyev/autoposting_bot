@@ -37,7 +37,7 @@ async def create_keyboard_tagged_channels(channels: list | tuple, channels_tagge
             channels_menu.insert(channel_button)
         else:
             i += 1
-            channel_button = InlineKeyboardButton(text=f'{channel_name}🥂',
+            channel_button = InlineKeyboardButton(text=f'{channel_name}🔮',
                                                   callback_data=f'channels_donor_{channel_id}')
             channels_menu.insert(channel_button)
     if i != 0:
@@ -66,7 +66,7 @@ async def create_type_time_keyboard() -> InlineKeyboardMarkup:
 
 async def create_interval_keyboard(type_time: str) -> InlineKeyboardMarkup:
     interval_menu = InlineKeyboardMarkup(row_width=4)
-    snow = '🎅'
+    snow = '🧃'
     if type_time == 'Минуты':
         minutes = ('5', '10', '15', '20', '25', '30', '35', '40', '45', '55')
         number_snow = random.randint(0, len(minutes) - 1)
@@ -136,23 +136,18 @@ async def create_confirm_keyboards(**kwargs) -> InlineKeyboardMarkup:
     else:
         auto_delete_posts_button = InlineKeyboardButton('Добавить авто удаление постов',
                                                         callback_data='confirm_donor_auto_delete_posts')
+    if kwargs.get('preview_link'):
+        preview_link = InlineKeyboardButton('Добавить предпросмотр ссылки✅',
+                                            callback_data='confirm_donor_preview_link_yes')
+    else:
+        preview_link = InlineKeyboardButton('Добавить предпросмотр ссылки',
+                                            callback_data='confirm_donor_preview_link')
     confirm_button = InlineKeyboardButton('Начать публикацию🏄‍♂️', callback_data='confirm_donor_start_pub')
     stop_button = InlineKeyboardButton('🛑STOP🛑', callback_data='stop_fsm')
     confirm_menu.insert(add_delete_text_post_button).insert(add_description_button).insert(mix_posts_button).\
-        insert(add_urls_button).insert(auto_delete_posts_button).insert(confirm_button).add(stop_button)
+        insert(add_urls_button).insert(auto_delete_posts_button).insert(preview_link).insert(confirm_button).\
+        add(stop_button)
     return confirm_menu
-
-
-async def create_add_additional_url():
-    """
-    Уточняет: хочет ли пользователь добавить ещё одну кнопку к донорам.
-    :return:
-    """
-    url_menu = InlineKeyboardMarkup(row_width=2)
-    yes_add = InlineKeyboardButton(text='Добавить', callback_data='confirm_donor_add_urls')
-    no_add = InlineKeyboardButton(text='Нет', callback_data='stop_donor_add_urls')
-    url_menu.insert(yes_add).insert(no_add)
-    return url_menu
 
 
 async def create_buttons_url(buttons: list[dict]) -> InlineKeyboardMarkup:
@@ -181,7 +176,7 @@ async def create_type_time_keyboard_for_delete_posts():
 
 async def create_interval_keyboard_for_delete_post(type_time: str) -> InlineKeyboardMarkup:
     interval_menu = InlineKeyboardMarkup(row_width=4)
-    snow = '🎅'
+    snow = '🍑'
     if type_time == 'Минуты':
         minutes = ('5', '10', '15', '20', '25', '30', '35', '40', '45', '55')
         number_snow = random.randint(0, len(minutes) - 1)
